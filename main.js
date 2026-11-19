@@ -49,11 +49,12 @@ if (S.radar && cadMap) {
   if (R.coneW && cmCone) cmCone.setAttribute('stroke-width', String(R.coneW));
   if (R.zones && cmZonesG) {
     cmZonesG.innerHTML = R.zones.map(z =>
-      `<rect class="cm-zone" data-stop="${z.stop}" data-p="${z.p}" data-tag="${z.tag}" x="${z.x}" y="${z.y}" width="${z.w}" height="${z.h}"/>`
+      `<rect class="cm-zone" data-stop="${z.stop}"${z.floor ? ` data-floor="${z.floor}"` : ''} data-p="${z.p}" data-tag="${z.tag}" x="${z.x}" y="${z.y}" width="${z.w}" height="${z.h}"/>`
     ).join('');
   }
   if (R.stops && cmStops) {
-    cmStops.style.gridTemplateColumns = `repeat(${R.stops.length}, 1fr)`;
+    cmStops.style.gridTemplateColumns = `repeat(${R.stops.length}, minmax(0, 1fr))`;
+    cadMap.classList.toggle('many', R.stops.length > 6);
     cmStops.innerHTML = R.stops.map(s =>
       `<button type="button" class="cm-btn" data-stop="${s.stop}" data-p="${s.p}" data-tag="${s.tag}">${s.label}</button>`
     ).join('');

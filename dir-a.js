@@ -1,456 +1,696 @@
-// Direction A, "The Board": the competition-board exploded axo of a timber house, in ink.
-// Layers land in building order, then the long lens widens and the drawing becomes a place.
+// Direction A, "The Board": the competition-board exploded axo of a two-storey house, white ink on a black sheet.
+// Seven layers land in building order, then the long lens widens, the glass door slides open and the drawing
+// becomes a place: in over the terrace, through the ground floor, up the stair and under the ridge.
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import {
-  THREE, Part, bx, beam, cyl, ball, panel, ring, M, V, D2R, clamp, lerp, ease, easeOut, win,
-  scene, lineMat, toneMat, segs, liveLine, eyeKey, canvasTex, ctx, ACCENT, INK, patchFill,
+  THREE, Part, bx, cyl, ball, panel, M, V, D2R, clamp, lerp, ease, ease2, win,
+  scene, lineMat, toneMat, segs, liveLine, eyeKey, camAt, canvasTex, ctx, ACCENT, INK, PAPER, patchFill,
 } from './core.js';
 
-// ---- the house (metres). x runs east, z south, y up. The glazed gable faces east onto a porch.
-const FL = 0.3, EH = 3.0, TP = Math.tan(40 * D2R), CP = Math.cos(40 * D2R), SP = Math.sin(40 * D2R);
-const ZO = 3.5, TH = 0.12, ZI = ZO - TH, XW = -7.4, XE = 7.4, XG = 5.9, F = FL + 0.03;
-const RISE = ZO * TP, PL = 0.1;
-const UL = z => FL + EH + PL + (ZO - Math.min(Math.abs(z), ZO)) * TP;   // underside of the rafters
-const Y0 = FL + EH + PL + RISE;                                          // that line at the ridge
-const OH = 0.55, T = (ZO + OH) / CP, XR = 7.95;                          // eave overhang, rafter length, roof ends
+// ---- the house (metres). x runs east, z south, y up. The glass front faces east onto a terrace.
+const FL = 0.3, F = FL + 0.03;                                          // slab top, finished ground floor
+const EH = 2.6, Y1 = FL + EH, CS = 0.2, Y2 = Y1 + CS, F2 = Y2 + 0.03;   // clear height, ceiling slab, upper floor
+const KH = 1.4, PL = 0.1, YP = Y2 + KH;                                 // knee wall, wall plate
+const TP = Math.tan(40 * D2R), CP = Math.cos(40 * D2R), SP = Math.sin(40 * D2R);
+const XW = -5, XE = 5, ZO = 3.6, TH = 0.16, XI = XE - TH, ZI = ZO - TH;
+const RISE = ZO * TP;
+const UL = z => YP + PL + (ZO - Math.min(Math.abs(z), ZO)) * TP;        // underside of the rafters
+const Y0 = YP + PL + RISE;                                              // that line at the ridge
+const OH = 0.5, T = (ZO + OH) / CP, XR = 5.45;                          // eave overhang, rafter length, roof ends
 
-// openings, as (u, v) rectangles in each wall's own drawing (v from the slab top)
-const SOUTH = [[-1.2, 0.45, 3.2, 2.45], [-6.6, 1.4, -5.8, 2.4]];
-const NORTH = [[-6.2, 0.8, -4.6, 2.3], [0.4, 1.05, 2.6, 2.25]];
-const WEST = [[-2.6, 0.5, -1.4, 2.6], [1.2, 1.4, 2.2, 2.4]];
-const ROUND = { c: [0, 4.35], r: 0.42 };
-const rect = ([a, b, c, d]) => [[a, b], [c, b], [c, d], [a, d]];
+// the stair along the west gable: 15 risers from the south landing up to the north
+const SX0 = XW + TH, SX1 = SX0 + 1.0, SZ = 2.4, GO = 0.27, NR = 15, RS = (F2 - F) / NR, STOP = SZ - (NR - 1) * GO;
+// the glass front: two sliding leaves between two posts, a fixed pane either side
+const DW = 1.7, LINT = 0.32, YL = Y1 - LINT;
+// the chimney block against the north wall and its flue
+const BX0 = 0.2, BX1 = 0.8, BZ = -1.0, PIPE = [0.5, -1.3];
+
+// openings as (a0, y0, a1, y1): metres along the wall, absolute heights
+const S1 = [[1.5, FL + 0.45, 4.1, FL + 2.4], [-2.7, FL + 0.9, -0.5, FL + 2.4]];
+const N1 = [[-3.4, FL + 1.1, -1.0, FL + 2.25], [3.1, FL + 0.9, 4.3, FL + 2.3]];
+const W1 = [[2.5, FL + 1.0, 3.2, FL + 2.3]];
+const S2 = [[-2.7, Y2 + 0.82, -0.7, Y2 + 1.26], [2.0, Y2 + 0.55, 4.0, Y2 + 1.26]];
+const N2 = [[2.0, Y2 + 0.85, 4.0, Y2 + 1.26]];
+const W2 = [[-0.9, Y2 + 1.0, 0.9, Y2 + 3.0]];
+const E2 = [[-1.5, Y2 + 0.85, 1.5, Y2 + 2.85]];
+const hole = (y) => ([a, b, c, d]) => [[a, b - y], [c, b - y], [c, d - y], [a, d - y]];
+
 function rb(x0, y0, z0, x1, y1, z1, r = 0.04) {
   const w = Math.abs(x1 - x0), h = Math.abs(y1 - y0), d = Math.abs(z1 - z0);
   const g = new RoundedBoxGeometry(w, h, d, 4, Math.min(r, Math.min(w, h, d) / 2 - 0.002));
   g.translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); return g;
 }
+// a rectangular bar from a to b whose width always stays horizontal (rails, lounger backs, handrails)
+function bar(a, b, w, d) {
+  const dir = b.clone().sub(a), L = dir.length(); dir.normalize();
+  let ax = V(0, 1, 0).cross(dir); if (ax.lengthSq() < 1e-6) ax = V(1, 0, 0); ax.normalize();
+  const ay = dir.clone().cross(ax);
+  const g = new THREE.BoxGeometry(w, d, L);
+  g.applyMatrix4(new THREE.Matrix4().makeBasis(ax, ay, dir));
+  g.translate((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2); return g;
+}
+const lying = (r, len, x, y, z, along = 'z', seg = 14) => {
+  const g = new THREE.CylinderGeometry(r, r, len, seg);
+  if (along === 'z') g.rotateX(Math.PI / 2); else g.rotateZ(Math.PI / 2);
+  g.translate(x, y, z); return g;
+};
+// a piece of one roof slope between x0 and x1: w0..w1 above the rafter line, cut plumb at z0, square at the eave
+function slope(side, x0, x1, w0, w1, z0, tEnd) {
+  const pts = [[z0, Y0 + w0 / CP - z0 * TP], [w0 * SP + tEnd * CP, Y0 + w0 * CP - tEnd * SP], [w1 * SP + tEnd * CP, Y0 + w1 * CP - tEnd * SP], [z0, Y0 + w1 / CP - z0 * TP]];
+  return panel(pts.map(([z, y]) => [side * z, y]), [], x1 - x0).applyMatrix4(M.alongZ(x1, 0));
+}
 
 export async function build(labels) {
+  const dk = lineMat({ w: 0.95, color: '#151517', opacity: 0.9 });       // ink for the light things
+  const light = { line: dk, hullColor: '#151517' };
   const PAL = {
-    white: { mat: toneMat('#fbfaf6', { mode: 0, scale: 1.0 }) },
-    floor: { mat: toneMat('#f3e5cd', { mode: 1, scale: 1.2 }) },
-    sunPatch: { mat: toneMat('#fdf3da', { mode: 1, scale: 1.2, opacity: 0.72 }), edges: false },
-    oak: { mat: toneMat('#f2e2c6', { mode: 1, scale: 1.6 }) },
-    concrete: { mat: toneMat('#dfdbd2', { mode: 2, scale: 1.0 }) },
-    glass: { mat: toneMat('#dce8eb', { opacity: 0.16, mode: 5 }) },
-    clad: { mat: toneMat('#faf8f2', { mode: 1, scale: 2.2 }), w: 'thin' },
-    seam: { mat: toneMat('#f3f1eb', { mode: 3, scale: 1.5 }), w: 'thin' },
-    rafter: { mat: toneMat('#f4e4cb', { mode: 1, scale: 2.0 }), w: 'mid' },
-    steel: { mat: toneMat('#d2cec5', { mode: 3, scale: 2.0 }), w: 'thin' },
-    leaf: { mat: toneMat('#eff0e6', { side: THREE.DoubleSide, mode: 0 }), w: 'mid', thr: 20 },
-    frame: { mat: toneMat('#ece7dc', { mode: 1, scale: 2.0 }) },
-    soft: { mat: toneMat('#f6f3ec', { mode: 4, scale: 1.0 }), hull: 1 },
-    cushion: { mat: toneMat('#f8f5ee', { mode: 4, scale: 1.4 }), hull: 1, thr: 50 },
-    terracotta: { mat: toneMat('#d97a54', { mode: 4, scale: 1.4 }), hull: 1, thr: 50 },
-    shade: { mat: toneMat('#fff5de', { mode: 4, scale: 1.5 }), hull: 1 },
-    ember: { mat: toneMat('#ff6a14', { mode: 0, scale: 1.0 }), edges: false },
-    book1: { mat: toneMat('#c85a32', { mode: 0 }), w: 'thin' },
-    book2: { mat: toneMat('#3d5467', { mode: 0 }), w: 'thin' },
-    book3: { mat: toneMat('#e2d6be', { mode: 0 }), w: 'thin' },
-    green: { mat: toneMat('#f1f0e8', { mode: 0 }), hull: 1, edges: false },
+    wall: { mat: toneMat('#26262a', { mode: 0, scale: 1.0, tex: 1.6 }) },
+    ceil: { mat: toneMat('#2c2c30', { mode: 1, scale: 0.9, tex: 1.4 }) },
+    floor: { mat: toneMat('#3f3b37', { mode: 1, scale: 1.2 }) },
+    deck: { mat: toneMat('#2a2826', { mode: 1, scale: 1.8 }) },
+    pool: { mat: toneMat('#8a8178', { mode: 0, opacity: 0.22, tex: 0 }), edges: false },
+    firepool: { mat: toneMat('#c02a2a', { mode: 0, opacity: 0.11, tex: 0 }), edges: false },
+    oak: { mat: toneMat('#57514b', { mode: 1, scale: 1.6 }) },
+    concrete: { mat: toneMat('#58585d', { mode: 2, scale: 1.0, tex: 1.8 }) },
+    glass: { mat: toneMat('#e6ecf0', { opacity: 0.085, mode: 5 }) },
+    clad: { mat: toneMat('#161618', { mode: 1, scale: 2.2, tex: 3.2 }), w: 'thin' },
+    seam: { mat: toneMat('#1c1c1f', { mode: 3, scale: 1.5, tex: 3.0 }), w: 'thin' },
+    under: { mat: toneMat('#34343a', { mode: 1, scale: 1.0, tex: 1.6 }) },
+    rafter: { mat: toneMat('#6a645d', { mode: 1, scale: 2.0 }), w: 'mid' },
+    steel: { mat: toneMat('#2b2b30', { mode: 3, scale: 2.0 }), w: 'thin' },
+    pipe: { mat: toneMat('#222226', { mode: 3, scale: 2.0 }), w: 'thin', hull: 1 },
+    rod: { mat: toneMat('#3a3a40', { mode: 3, scale: 2.0, tex: 1 }), edges: false, hull: 0.8 },
+    kfront: { mat: toneMat('#19191c', { mode: 0, scale: 1.0, tex: 1.2 }) },
+    bright: { mat: toneMat('#e7e4df', { mode: 0, tex: 0.9 }), ...light },
+    leaf: { mat: toneMat('#2b2f2c', { side: THREE.DoubleSide, mode: 0 }), w: 'mid', thr: 20 },
+    frame: { mat: toneMat('#17171a', { mode: 1, scale: 2.0 }) },
+    redframe: { mat: toneMat('#c8141f', { mode: 3, scale: 2.0, tex: 1.2 }) },
+    rug: { mat: toneMat('#4b4b51', { mode: 4, scale: 1.0, tex: 1.8 }) },
+    soft: { mat: toneMat('#dcd9d3', { mode: 4, scale: 1.0, tex: 0.9 }), hull: 1, ...light },
+    cushion: { mat: toneMat('#e2dfd9', { mode: 4, scale: 1.4, tex: 0.9 }), hull: 1, thr: 50, ...light },
+    rouge: { mat: toneMat('#cc1f2b', { mode: 4, scale: 1.4, tex: 1.3 }), hull: 1, thr: 50, ...light },
+    shade: { mat: toneMat('#fff3e2', { mode: 4, scale: 1.5, tex: 0.5, glow: '#262019' }), hull: 1, ...light },
+    ember: { mat: toneMat('#ff3526', { mode: 0, tex: 0, glow: '#3a0603' }), edges: false },
+    book1: { mat: toneMat('#c81e2a', { mode: 0, tex: 1 }), w: 'thin' },
+    book2: { mat: toneMat('#e7e4df', { mode: 0, tex: 1 }), w: 'thin', ...light },
+    book3: { mat: toneMat('#6c6c72', { mode: 0, tex: 1 }), w: 'thin' },
   };
-  const hatchMat = lineMat({ w: 0.6, color: '#8f897d', opacity: 0.9 });
-  const dashMat = lineMat({ w: 0.9, color: INK, dashed: true, dash: 0.22, gap: 0.2, opacity: 0.75 });
+  const flameMat = toneMat('#ff4a2c', { mode: 0, tex: 0, glow: '#4a0a05', side: THREE.DoubleSide, opacity: 0.92 });
+  const hatchMat = lineMat({ w: 0.6, color: '#8b8883', opacity: 0.62 });
+  const dashMat = lineMat({ w: 0.9, color: INK, dashed: true, dash: 0.22, gap: 0.2, opacity: 0.7 });
 
   // ---- the plan the house stands on
-  const plan = new THREE.Mesh(new THREE.PlaneGeometry(24, 16).rotateX(-Math.PI / 2), patchFill(new THREE.MeshBasicMaterial({ map: drawPlan() })));
+  const plan = new THREE.Mesh(new THREE.PlaneGeometry(24, 16).rotateX(-Math.PI / 2), patchFill(new THREE.MeshBasicMaterial({ map: drawPlan() }), { wash: false, grain: 0, grade: false }));
   plan.position.y = -0.01; scene.add(plan);
 
   const layers = [];
   function layer(id, no, name, sub, level) {
     const g = new THREE.Group(); scene.add(g);
-    const line = lineMat({ w: 1.45 }), mid = lineMat({ w: 0.95 }), thin = lineMat({ w: 0.6, opacity: 0.6 });
+    const line = lineMat({ w: 1.3 }), mid = lineMat({ w: 0.9 }), thin = lineMat({ w: 0.55, opacity: 0.5 });
     const W = { mid, thin };
     const L = { id, no, name, sub, level, g, line, lines: [line, mid, thin], subs: [] };
     L.part = new Part(g, PAL, line, W);
-    L.side = (dir) => { const sg = new THREE.Group(); g.add(sg); const s = { g: sg, dir, part: new Part(sg, PAL, line, W) }; L.subs.push(s); return s; };
+    // a piece of the layer that is pulled out sideways; lv is the storey it rides with
+    L.side = (dir, lv = level) => { const sg = new THREE.Group(); g.add(sg); const s = { g: sg, dir, lv, part: new Part(sg, PAL, line, W) }; L.subs.push(s); return s; };
     layers.push(L); return L;
   }
 
-  // 01 Floor: slab on strip footings, the oak boards, sunlit floor patches, the furniture that stands on it
+  // =====================================================================================================
+  // 01 Floor: slab on strip footings, the smoked-oak boards, the terrace deck, everything that stands loose
   const L1 = layer('floor', '01', 'Boden', 'Betonplatte auf Streifenfundamenten', 1);
-  L1.part.add('concrete', bx(-7.55, 0, -3.6, 7.5, FL, 3.6),
-    bx(-7.55, -0.7, -3.6, 7.5, 0, -3.1), bx(-7.55, -0.7, 3.1, 7.5, 0, 3.6),
-    bx(-7.55, -0.7, -3.1, -7.05, 0, 3.1), bx(7.0, -0.7, -3.1, 7.5, 0, 3.1));
-  // galvanized steel perimeter hold-down brackets along the slab edge
-  for (const x of [-7.1, -3.7, 0.2, 3.8, 5.8]) {
-    L1.part.add('steel', bx(x - 0.06, FL - 0.08, ZO - 0.01, x + 0.06, FL + 0.04, ZO + 0.015),
-      bx(x - 0.06, FL - 0.08, -ZO - 0.015, x + 0.06, FL + 0.04, -ZO + 0.01));
-  }
-  L1.part.add('floor', bx(-7.28, FL, -ZI, XE, F, ZI));
-  // warm sunlit floor patches cast through south windows and east glass gable
-  L1.part.add('sunPatch',
-    bx(-0.95, F + 0.001, 1.15, 2.95, F + 0.003, 3.22),
-    bx(4.05, F + 0.001, -2.15, 5.82, F + 0.003, 2.15));
-  // a trestle table in oak, a bench, three chairs with legs and a back, plus tabletop vessels
-  L1.part.add('oak', bx(1.7, F + 0.72, -0.25, 3.9, F + 0.76, 0.75));
-  for (const x of [2.0, 3.6]) {
-    L1.part.add('oak', beam(V(x, F, -0.22), V(x, F + 0.72, 0.12), 0.06, 0.05), beam(V(x, F, 0.72), V(x, F + 0.72, 0.38), 0.06, 0.05), bx(x - 0.035, F + 0.64, -0.2, x + 0.035, F + 0.72, 0.7));
-  }
-  L1.part.add('oak', bx(2.0, F + 0.32, 0.22, 3.6, F + 0.37, 0.28));
-  L1.part.add('soft', cyl(0.15, 0.055, 2.55, F + 0.76, 0.25, 28, 0.09), cyl(0.055, 0.16, 3.15, F + 0.76, 0.18, 20, 0.042));
-  L1.part.add('terracotta', cyl(0.045, 0.12, 2.95, F + 0.76, 0.36, 18, 0.035));
-  L1.part.add('oak', bx(1.9, F + 0.42, 0.98, 3.7, F + 0.46, 1.3), bx(2.0, F, 1.0, 2.05, F + 0.42, 1.28), bx(3.55, F, 1.0, 3.6, F + 0.42, 1.28));
-  for (const x of [2.2, 2.8, 3.4]) {
-    L1.part.add('oak', bx(x - 0.2, F + 0.44, -0.84, x + 0.2, F + 0.47, -0.44));
-    for (const [dx, dz] of [[-0.17, -0.81], [0.17, -0.81], [-0.17, -0.47], [0.17, -0.47]]) L1.part.add('oak', bx(x + dx - 0.017, F, dz - 0.017, x + dx + 0.017, F + 0.44, dz + 0.017));
-    for (const dx of [-0.17, 0.17]) L1.part.add('oak', bx(x + dx - 0.017, F + 0.47, -0.83, x + dx + 0.017, F + 0.88, -0.8));
-    L1.part.add('oak', bx(x - 0.19, F + 0.8, -0.835, x + 0.19, F + 0.88, -0.795), bx(x - 0.19, F + 0.62, -0.83, x + 0.19, F + 0.65, -0.8));
-  }
-  // the sofa faces the long south window: a woven rug, base, two seat cushions, two back cushions, arms, accent pillow
-  L1.part.add('white', bx(-3.2, F, 0.75, 0.45, F + 0.012, 3.05));
-  L1.part.add('oak', bx(-2.88, F + 0.06, 1.02, -0.62, F + 0.26, 1.88));
-  L1.part.add('cushion', rb(-2.9, F + 0.06, 1.0, -0.6, F + 0.8, 1.22, 0.07),
-    rb(-2.9, F + 0.06, 1.0, -2.7, F + 0.62, 1.9, 0.06), rb(-0.8, F + 0.06, 1.0, -0.6, F + 0.62, 1.9, 0.06),
-    rb(-2.7, F + 0.26, 1.22, -1.76, F + 0.46, 1.88, 0.06), rb(-1.74, F + 0.26, 1.22, -0.8, F + 0.46, 1.88, 0.06),
-    rb(-2.68, F + 0.46, 1.22, -1.78, F + 0.8, 1.4, 0.07), rb(-1.72, F + 0.46, 1.22, -0.82, F + 0.8, 1.4, 0.07));
-  L1.part.add('terracotta', rb(-2.64, F + 0.46, 1.38, -2.24, F + 0.74, 1.66, 0.05));
-  for (const [x, z] of [[-2.85, 1.05], [-0.65, 1.05], [-2.85, 1.85], [-0.65, 1.85]]) L1.part.add('oak', bx(x - 0.03, F, z - 0.03, x + 0.03, F + 0.06, z + 0.03));
-  // sculptural oak lounge armchair & floor reading lamp completing the living conversation group
-  L1.part.add('oak', bx(-0.32, F + 0.24, 2.05, 0.26, F + 0.30, 2.62),
-    bx(-0.32, F, 2.05, -0.27, F + 0.52, 2.62), bx(0.21, F, 2.05, 0.26, F + 0.52, 2.62),
-    bx(0.18, F + 0.30, 2.07, 0.24, F + 0.74, 2.60));
-  L1.part.add('cushion', rb(-0.26, F + 0.30, 2.08, 0.18, F + 0.44, 2.59, 0.05),
-    rb(0.06, F + 0.44, 2.09, 0.19, F + 0.72, 2.58, 0.05));
-  L1.part.add('steel', cyl(0.14, 0.02, -3.05, F, 1.15, 24), cyl(0.012, 1.32, -3.05, F + 0.02, 1.15, 12));
-  L1.part.add('shade', cyl(0.16, 0.22, -3.05, F + 1.28, 1.15, 28, 0.11));
-  L1.part.add('soft', cyl(0.4, 0.04, -1.75, F + 0.36, 2.4, 48), cyl(0.04, 0.36, -1.75, F, 2.4, 16));
-  L1.part.add('book1', bx(-1.92, F + 0.4, 2.28, -1.64, F + 0.435, 2.48));
-  L1.part.add('soft', cyl(0.042, 0.065, -1.56, F + 0.4, 2.42, 16));
-  // a wood stove on its hearth against the box, with glowing amber firebox embers & stacked birch logs
-  L1.part.add('concrete', bx(-3.62, F, -0.75, -2.75, F + 0.025, 0.35));
-  L1.part.add('soft', cyl(0.27, 0.78, -3.2, F + 0.12, -0.2, 40), cyl(0.3, 0.04, -3.2, F + 0.9, -0.2, 40));
-  L1.part.add('steel', bx(-3.31, F + 0.3, 0.05, -3.09, F + 0.58, 0.075), bx(-2.95, F + 0.3, -0.32, -2.92, F + 0.58, -0.08));
-  L1.part.add('ember', bx(-3.27, F + 0.34, 0.052, -3.13, F + 0.51, 0.082), bx(-2.94, F + 0.34, -0.29, -2.912, F + 0.51, -0.11));
-  for (const a of [0.6, 2.7, 4.8]) L1.part.add('steel', bx(-3.2 + Math.cos(a) * 0.2 - 0.02, F + 0.02, -0.2 + Math.sin(a) * 0.2 - 0.02, -3.2 + Math.cos(a) * 0.2 + 0.02, F + 0.12, -0.2 + Math.sin(a) * 0.2 + 0.02));
-  L1.part.add('steel', bx(-3.52, F + 0.025, -0.68, -2.98, F + 0.28, -0.46));
-  for (const [ly, lz] of [[0.07, -0.61], [0.07, -0.52], [0.16, -0.565]]) {
-    L1.part.add('oak', bx(-3.48, F + ly, lz - 0.035, -3.02, F + ly + 0.07, lz + 0.035));
-  }
-  // ground-floor bedroom & bathroom furniture inside the oak box (visible through the open doorways)
-  L1.part.add('oak', bx(-7.1, F, -3.2, -5.2, F + 0.24, -1.2), bx(-7.1, F, -1.15, -6.65, F + 0.42, -0.78));
-  L1.part.add('cushion', rb(-7.02, F + 0.24, -3.12, -5.28, F + 0.44, -1.28, 0.06),
-    rb(-6.98, F + 0.44, -3.02, -6.58, F + 0.62, -2.24, 0.05), rb(-6.98, F + 0.44, -2.14, -6.58, F + 0.62, -1.36, 0.05));
-  L1.part.add('oak', bx(-7.1, F, 0.4, -6.42, F + 0.82, 2.15));
-  L1.part.add('white', cyl(0.19, 0.11, -6.74, F + 0.82, 1.25, 24));
-  // a fig by the glass, drawn leaf by leaf
-  L1.part.add('soft', cyl(0.2, 0.42, 5.3, F, -2.85, 40, 0.16));
-  L1.part.add('oak', cyl(0.014, 1.25, 5.3, F + 0.4, -2.85, 8));
-  const leaf = new THREE.Shape(); leaf.absellipse(0, 0.17, 0.085, 0.17, 0, Math.PI * 2, false);
-  for (let i = 0; i < 15; i++) {
-    const h = F + 0.75 + i * 0.065, a = i * 2.4, th = 0.75 + (i % 3) * 0.2, k = 0.85 + (i % 4) * 0.08;
-    const g = new THREE.ExtrudeGeometry(leaf, { depth: 0.004, bevelEnabled: false, curveSegments: 20 });
-    g.scale(k, k, 1); g.applyMatrix4(new THREE.Matrix4().makeRotationY(a).multiply(new THREE.Matrix4().makeRotationX(th)));
-    g.translate(5.3, h, -2.85); L1.part.add('leaf', g);
-  }
-  // floor boards, drawn as hatching
-  const boards = [];
-  for (let z = -ZI + 0.2; z < ZI; z += 0.2) boards.push([-7.28, F + 0.001, z, XG, F + 0.001, z]);
-  for (let z = -ZI + 0.14; z < ZI; z += 0.14) boards.push([XG + 0.06, F + 0.001, z, XE, F + 0.001, z]);
-  segs(L1.g, boards, hatchMat);
-
-  // 02 Structure: CLT walls, the oak box with its furnished mezzanine loft, the kitchen
-  const L2 = layer('structure', '02', 'Tragwerk', 'Brettsperrholz, 120 mm', 2);
-  const longOut = [[-7.28, 0], [6.2, 0], [6.2, 2.4], [XE, 2.4], [XE, EH], [-7.28, EH]];
-  L2.part.add('white', panel(longOut, SOUTH.map(rect), TH).applyMatrix4(M.alongX(ZI, FL)));
-  L2.part.add('white', panel(longOut, NORTH.map(rect), TH).applyMatrix4(M.alongX(-ZO, FL)));
-  const gable = [[-ZO, 0], [ZO, 0], [ZO, EH + PL], [0, EH + PL + RISE], [-ZO, EH + PL]];
-  L2.part.add('white', panel(gable, [...WEST.map(rect), ROUND], TH).applyMatrix4(M.alongZ(XW + TH, FL)));
-  L2.part.add('rafter', bx(-7.28, FL + EH, ZI, XE, FL + EH + PL, ZO), bx(-7.28, FL + EH, -ZO, XE, FL + EH + PL, -ZI));
-  // the box: a partition with two doors, a wall between bed and bath, the loft on top with its rail, ladder, and loft furniture
-  const part = [[-ZI, 0.03], [-1.6, 0.03], [-1.6, 2.13], [-0.7, 2.13], [-0.7, 0.03], [0.7, 0.03], [0.7, 2.13], [1.5, 2.13], [1.5, 0.03], [ZI, 0.03], [ZI, 2.75], [-ZI, 2.75]];
-  L2.part.add('oak', panel(part, [], 0.12).applyMatrix4(M.alongZ(-3.7, FL)));
-  L2.part.add('oak', panel([[-7.28, 0.03], [-3.82, 0.03], [-3.82, 2.75], [-7.28, 2.75]], [], 0.1).applyMatrix4(M.alongX(-0.05, FL)));
-  const LOFT_Y = FL + 2.9;
-  L2.part.add('oak', bx(-7.28, FL + 2.75, -ZI, -3.7, LOFT_Y, ZI));
-  // loft balustrade with a clean entry opening at the ladder (z = -2.55 .. -1.90)
-  for (const z of [-3.15, -2.55, -1.90, -1.15, -0.40, 0.35, 1.10, 1.85, 2.60, 3.25]) {
-    L2.part.add('oak', bx(-3.79, LOFT_Y, z - 0.022, -3.74, FL + 3.85, z + 0.022));
-  }
-  L2.part.add('oak',
-    bx(-3.8, FL + 3.85, -ZI, -3.73, FL + 3.9, -2.52),
-    bx(-3.8, FL + 3.85, -1.93, -3.73, FL + 3.9, ZI));
-  // furnished Oak Mezzanine Loft (+3.20m): woven rug, low oak platform bed, linen mattress, terracotta throw, pillows, bedside tables, glowing lamp, and north eave bookshelf
-  L2.part.add('white', bx(-6.85, LOFT_Y, -1.45, -4.35, LOFT_Y + 0.012, 1.45));
-  L2.part.add('oak',
-    bx(-7.15, LOFT_Y, -1.12, -5.05, LOFT_Y + 0.22, 1.12),
-    bx(-7.18, LOFT_Y + 0.22, -1.12, -7.06, LOFT_Y + 0.78, 1.12));
-  L2.part.add('cushion',
-    rb(-7.04, LOFT_Y + 0.22, -1.0, -5.15, LOFT_Y + 0.42, 1.0, 0.06),
-    rb(-7.00, LOFT_Y + 0.42, -0.88, -6.58, LOFT_Y + 0.62, -0.06, 0.06),
-    rb(-7.00, LOFT_Y + 0.42, 0.06, -6.58, LOFT_Y + 0.62, 0.88, 0.06));
-  L2.part.add('terracotta',
-    rb(-5.68, LOFT_Y + 0.23, -1.02, -5.12, LOFT_Y + 0.45, 1.02, 0.05),
-    rb(-6.62, LOFT_Y + 0.42, -0.35, -6.36, LOFT_Y + 0.58, 0.35, 0.05));
-  // bedside tables & warm linen lamp
-  L2.part.add('oak',
-    bx(-7.12, LOFT_Y, 1.24, -6.68, LOFT_Y + 0.42, 1.68),
-    bx(-7.12, LOFT_Y, -1.68, -6.68, LOFT_Y + 0.42, -1.24));
-  L2.part.add('soft', cyl(0.055, 0.16, -6.9, LOFT_Y + 0.42, 1.46, 20));
-  L2.part.add('shade', cyl(0.14, 0.19, -6.9, LOFT_Y + 0.56, 1.46, 28, 0.09));
-  L2.part.add('book2', bx(-7.02, LOFT_Y + 0.42, -1.56, -6.76, LOFT_Y + 0.46, -1.34));
-  // low built-in north eave loft bookshelf & study credenza
-  L2.part.add('oak',
-    bx(-6.95, LOFT_Y, -3.18, -4.15, LOFT_Y + 0.04, -2.76),
-    bx(-6.95, LOFT_Y + 0.36, -3.18, -4.15, LOFT_Y + 0.39, -2.76),
-    bx(-6.95, LOFT_Y + 0.68, -3.18, -4.15, LOFT_Y + 0.72, -2.76),
-    bx(-6.95, LOFT_Y, -3.18, -6.91, LOFT_Y + 0.72, -2.76),
-    bx(-5.55, LOFT_Y, -3.18, -5.51, LOFT_Y + 0.72, -2.76),
-    bx(-4.19, LOFT_Y, -3.18, -4.15, LOFT_Y + 0.72, -2.76));
-  L2.part.add('book1', bx(-6.82, LOFT_Y + 0.39, -3.12, -6.52, LOFT_Y + 0.64, -2.84), bx(-5.38, LOFT_Y + 0.04, -3.12, -5.08, LOFT_Y + 0.32, -2.84));
-  L2.part.add('book2', bx(-6.48, LOFT_Y + 0.39, -3.12, -6.18, LOFT_Y + 0.66, -2.84), bx(-5.02, LOFT_Y + 0.39, -3.12, -4.74, LOFT_Y + 0.63, -2.84));
-  L2.part.add('book3', bx(-6.14, LOFT_Y + 0.39, -3.12, -5.82, LOFT_Y + 0.61, -2.84), bx(-4.70, LOFT_Y + 0.39, -3.12, -4.42, LOFT_Y + 0.65, -2.84));
-  L2.part.add('soft', cyl(0.075, 0.18, -4.65, LOFT_Y + 0.72, -2.96, 20));
-  // timber loft ladder against the east face of the oak box
-  for (const z of [-2.45, -2.0]) L2.part.add('oak', beam(V(-3.32, F, z), V(-3.69, FL + 2.92, z), 0.032, 0.055));
-  for (let i = 1; i <= 8; i++) {
-    const u = i / 9, ly = lerp(F, FL + 2.9, u), lx = lerp(-3.32, -3.69, u);
-    L2.part.add('oak', bx(lx - 0.02, ly - 0.012, -2.45, lx + 0.02, ly + 0.012, -2.0));
-  }
-  L2.part.add('soft', cyl(0.075, 7.35 - (F + 0.94), -3.2, F + 0.94, -0.2, 28), cyl(0.12, 0.06, -3.2, 7.35, -0.2, 28));
-  // kitchen: tall unit, base run, oak worktop, inset sink + mixer tap, open upper shelf, door joints
-  L2.part.add('white', bx(-2.9, F, -ZI, -1.7, F + 2.3, -2.76), bx(-1.7, F, -ZI, 3.1, F + 0.86, -2.78));
-  L2.part.add('oak', bx(-1.72, F + 0.86, -ZI, 3.12, F + 0.9, -2.74), bx(-1.4, F + 1.52, -ZI, 2.5, F + 1.555, -3.1));
-  L2.part.add('steel', bx(0.32, F + 0.9, -3.24, 0.92, F + 0.908, -2.86), cyl(0.015, 0.28, 0.62, F + 0.9, -3.3, 12), bx(-0.95, F + 0.9, -3.24, -0.25, F + 0.906, -2.86));
-  L2.part.add('soft', cyl(0.065, 0.16, -0.9, F + 1.555, -3.24, 20), cyl(0.055, 0.13, -0.72, F + 1.555, -3.24, 20), cyl(0.08, 0.2, 1.8, F + 1.555, -3.24, 24));
-  L2.part.add('terracotta', cyl(0.06, 0.15, 1.52, F + 1.555, -3.24, 20));
-  const joints = [];
-  for (let x = -1.1; x < 3.1; x += 0.6) joints.push([x, F + 0.02, -2.779, x, F + 0.84, -2.779]);
-  joints.push([-2.3, F + 0.02, -2.759, -2.3, F + 2.28, -2.759], [-2.9, F + 1.5, -2.759, -1.7, F + 1.5, -2.759]);
-  // CLT panel assembly cassette joints along the 120mm perimeter walls
-  for (const x of [-4.8, -2.4, 3.6]) {
-    joints.push([x, FL, ZO + 0.002, x, FL + EH, ZO + 0.002], [x, FL, -ZO - 0.002, x, FL + EH, -ZO - 0.002]);
-  }
-  segs(L2.g, joints, hatchMat);
-
-  // 03 Glazing (rides with the walls, pulled out sideways): the glass gable, the windows, a sliding door
-  const L3 = layer('glazing', '03', 'Verglasung', 'Dreifachverglasung, Eichenrahmen', 2);
-  const gE = L3.side(V(1, 0, 0)), gS = L3.side(V(0, 0, 1)), gN = L3.side(V(0, 0, -1)), gW = L3.side(V(-1, 0, 0));
-  const mull = [-ZI, -1.9, -0.6, 0.6, 1.9, ZI];
-  for (const z of mull) { const zz = clamp(z, -ZI + 0.04, ZI - 0.04); gE.part.add('frame', bx(XG - 0.06, F, zz - 0.04, XG + 0.06, UL(Math.abs(zz) + 0.04) - 0.02, zz + 0.04)); }
-  gE.part.add('frame', bx(XG - 0.06, FL, -ZI, XG + 0.06, F + 0.06, ZI), bx(XG - 0.06, F + 2.26, -ZI, XG + 0.06, F + 2.34, ZI));
-  for (const s of [-1, 1]) gE.part.add('frame', beam(V(XG, UL(ZI) - 0.04, s * ZI), V(XG, UL(0) - 0.04, 0), 0.12, 0.08));
-  gE.part.add('frame', bx(XG - 0.06, F, -0.04, XG + 0.06, UL(0.04) - 0.02, 0.04));
-  const gl = [[-ZI, 0.08], [ZI, 0.08], [ZI, UL(ZI) - FL - 0.06], [0, UL(0) - FL - 0.06], [-ZI, UL(ZI) - FL - 0.06]];
-  gE.part.add('glass', panel(gl, [], 0.02).applyMatrix4(M.alongZ(XG + 0.01, FL)));
-  const door = L3.side(V(1, 0, 0)); L3.door = door;
-  door.part.add('frame', bx(XG + 0.07, F, -0.62, XG + 0.13, F + 2.26, -0.56), bx(XG + 0.07, F, 0.56, XG + 0.13, F + 2.26, 0.62),
-    bx(XG + 0.07, F, -0.62, XG + 0.13, F + 0.08, 0.62), bx(XG + 0.07, F + 2.18, -0.62, XG + 0.13, F + 2.26, 0.62));
-  door.part.add('steel', bx(XG + 0.13, F + 0.92, -0.53, XG + 0.15, F + 1.32, -0.50));
-  door.part.add('glass', bx(XG + 0.09, F + 0.08, -0.56, XG + 0.11, F + 2.18, 0.56));
-  // windows: a frame in the wall's thickness, projecting cill flashing, and pane
-  function win4(part, axis, w0, w1, [a0, v0, a1, v1]) {
-    const y0 = FL + v0, y1 = FL + v1, f = 0.06;
-    const B = axis === 'x' ? (x0, yy0, x1, yy1, ww0, ww1) => bx(x0, yy0, ww0, x1, yy1, ww1) : (z0, yy0, z1, yy1, ww0, ww1) => bx(ww0, yy0, z0, ww1, yy1, z1);
-    part.add('frame', B(a0, y0, a1, y0 + f, w0, w1), B(a0, y1 - f, a1, y1, w0, w1), B(a0, y0 + f, a0 + f, y1 - f, w0, w1), B(a1 - f, y0 + f, a1, y1 - f, w0, w1));
-    const m = (w0 + w1) / 2; part.add('glass', B(a0 + f, y0 + f, a1 - f, y1 - f, m - 0.01, m + 0.01));
-  }
-  for (const o of SOUTH) win4(gS.part, 'x', ZI, ZO, o);
-  for (const o of NORTH) win4(gN.part, 'x', -ZO, -ZI, o);
-  for (const [a0, v0, a1, v1] of WEST) win4(gW.part, 'z', XW, XW + TH, [a0, v0, a1, v1]);
-  gW.part.add('frame', ring(0.36, 0.42, TH).applyMatrix4(new THREE.Matrix4().makeTranslation(XW + TH, FL + ROUND.c[1], 0).multiply(new THREE.Matrix4().makeRotationY(-Math.PI / 2))));
-  gW.part.add('glass', new THREE.CylinderGeometry(0.36, 0.36, 0.02, 40).rotateZ(Math.PI / 2).translate(XW + TH / 2, FL + ROUND.c[1], 0));
-
-  // 04 Cladding: vertical larch boards on battens, pulled out from each wall
-  const L4 = layer('cladding', '04', 'Fassade', 'Senkrechte Lärchenbretter, 22 × 140', 2);
-  const cS = L4.side(V(0, 0, 1)), cN = L4.side(V(0, 0, -1)), cW = L4.side(V(-1, 0, 0));
-  const BW = 0.14, BG = 0.026, c0 = FL - 0.25;
-  function boardsAlong(holes, a0, a1, top, notch) {
-    const out = [];
-    for (let a = a0; a + BW <= a1 + 1e-6; a += BW + BG) {
-      const b = a + BW; let spans = [[c0, top(a, b)]];
-      if (notch && b > notch[0]) spans = [[FL + notch[1], top(a, b)]];
-      for (const h of holes) {
-        const [u0, v0, u1, v1] = h.r ? [h.c[0] - h.r, h.c[1] - h.r, h.c[0] + h.r, h.c[1] + h.r] : h;
-        if (b > u0 && a < u1) spans = spans.flatMap(([s, e]) => [[s, Math.min(e, FL + v0 - 0.03)], [Math.max(s, FL + v1 + 0.03), e]]).filter(([s, e]) => e - s > 0.05);
-      }
-      for (const [s, e] of spans) out.push([a, b, s, e]);
+  {
+    const P = L1.part;
+    P.add('concrete', bx(XW, 0, -ZO, XE, FL, ZO),
+      bx(XW, -0.7, -ZO, XE, 0, -ZO + 0.5), bx(XW, -0.7, ZO - 0.5, XE, 0, ZO),
+      bx(XW, -0.7, -ZO + 0.5, XW + 0.5, 0, ZO - 0.5), bx(XE - 0.5, -0.7, -ZO + 0.5, XE, 0, ZO - 0.5));
+    // galvanised hold-down angles between slab and wall, in the batten gap
+    for (const x of [-4.6, -2.3, 0, 2.3, 4.6]) {
+      P.add('steel', bx(x - 0.06, FL - 0.08, ZO, x + 0.06, FL + 0.04, ZO + 0.022),
+        bx(x - 0.06, FL - 0.08, -ZO - 0.022, x + 0.06, FL + 0.04, -ZO));
     }
-    return out;
-  }
-  const flat = () => FL + EH + PL;
-  for (const [a, b, s, e] of boardsAlong(SOUTH, -7.452, XE, flat, [6.2, 2.4])) cS.part.add('clad', bx(a, s, ZO + 0.03, b, e, ZO + 0.052));
-  for (const [a, b, s, e] of boardsAlong(NORTH, -7.452, XE, flat, [6.2, 2.4])) cN.part.add('clad', bx(a, s, -ZO - 0.052, b, e, -ZO - 0.03));
-  const gTop = (a, b) => UL(Math.max(Math.abs(a), Math.abs(b)));
-  for (const [a, b, s, e] of boardsAlong([...WEST, ROUND], -ZO - 0.052, ZO + 0.052, gTop)) cW.part.add('clad', bx(XW - 0.052, s, a, XW - 0.03, e, b));
+    P.add('floor', bx(XW + TH, FL, -ZI, XI + 0.02, F, ZI));
+    // the terrace: joists on pad footings, charred decking, one wide step
+    for (const x of [5.3, 6.02, 6.76, 7.5, 8.12]) P.add('oak', bx(x - 0.04, FL - 0.2, -ZO, x + 0.04, FL - 0.04, ZO));
+    for (const x of [5.3, 6.76, 8.12]) for (const z of [-3.3, 0, 3.3]) P.add('concrete', bx(x - 0.15, -0.3, z - 0.15, x + 0.15, FL - 0.2, z + 0.15));
+    P.add('deck', bx(XE + 0.02, FL - 0.04, -ZO, 8.2, FL, ZO), bx(8.24, 0.03, -1.9, 8.66, 0.15, 1.9));
+    P.add('concrete', bx(8.26, -0.3, -1.8, 8.64, 0.03, -1.5), bx(8.26, -0.3, 1.5, 8.64, 0.03, 1.8));
+    // a concrete trough with grasses on the north side of the terrace, a lounger on the south
+    P.add('concrete', bx(5.5, FL, -3.42, 7.7, FL + 0.46, -3.32), bx(5.5, FL, -2.9, 7.7, FL + 0.46, -2.8),
+      bx(5.5, FL, -3.32, 5.6, FL + 0.46, -2.9), bx(7.6, FL, -3.32, 7.7, FL + 0.46, -2.9));
+    P.add('deck', bx(5.6, FL, -3.32, 7.6, FL + 0.4, -2.9));
+    const blade = new THREE.Shape(); blade.absellipse(0, 0.3, 0.022, 0.3, 0, Math.PI * 2, false);
+    for (let c = 0; c < 4; c++) for (let i = 0; i < 9; i++) {
+      const k = 0.75 + ((i * 7 + c * 3) % 5) * 0.11, a = i * 0.7 + c, th = 0.12 + (i % 4) * 0.13;
+      const g = new THREE.ExtrudeGeometry(blade, { depth: 0.003, bevelEnabled: false, curveSegments: 10 });
+      g.scale(1, k, 1); g.applyMatrix4(new THREE.Matrix4().makeRotationY(a).multiply(new THREE.Matrix4().makeRotationX(th)));
+      g.translate(5.9 + c * 0.47, FL + 0.4, -3.11); P.add('leaf', g);
+    }
+    P.add('oak', bx(5.95, FL + 0.2, 2.05, 7.75, FL + 0.25, 2.75));
+    for (const x of [6.02, 7.62]) for (const z of [2.09, 2.67]) P.add('oak', bx(x - 0.03, FL, z - 0.03, x + 0.03, FL + 0.2, z + 0.03));
+    P.add('cushion', rb(6.66, FL + 0.25, 2.08, 7.72, FL + 0.33, 2.72, 0.035));
+    P.add('oak', bar(V(6.6, FL + 0.272, 2.4), V(6.05, FL + 0.622, 2.4), 0.7, 0.04));
+    P.add('cushion', bar(V(6.634, FL + 0.324, 2.4), V(6.084, FL + 0.674, 2.4), 0.62, 0.065));
+    P.add('rouge', rb(6.9, FL + 0.33, 2.2, 7.2, FL + 0.41, 2.6, 0.035));
 
-  // 05 Roof structure and 06 Roof: built in the plane of each slope, then turned into place
-  const slopeM = (side) => {
-    const s = Math.sin(40 * D2R), c = CP;
+    // -- living: a rug, a corner sofa with its back to the south window, two round tables, a red lounge chair
+    P.add('rug', bx(1.25, F, 0.2, 4.45, F + 0.012, 3.05));
+    P.add('steel', bx(1.64, F + 0.07, 1.99, 3.96, F + 0.2, 2.9), bx(3.24, F + 0.07, 1.04, 3.96, F + 0.2, 1.99));
+    for (const [x, z] of [[1.7, 2.05], [1.7, 2.84], [3.9, 2.84], [3.9, 1.1], [3.3, 1.1]]) P.add('steel', bx(x - 0.025, F + 0.012, z - 0.025, x + 0.025, F + 0.07, z + 0.025));
+    P.add('cushion',
+      rb(1.62, F + 0.2, 1.95, 2.41, F + 0.44, 2.66, 0.07), rb(2.43, F + 0.2, 1.95, 3.21, F + 0.44, 2.66, 0.07),
+      rb(3.23, F + 0.2, 1.0, 3.98, F + 0.44, 2.66, 0.07),
+      rb(1.62, F + 0.2, 2.66, 3.98, F + 0.82, 2.92, 0.08),
+      rb(1.42, F + 0.2, 1.95, 1.62, F + 0.6, 2.92, 0.07), rb(3.98, F + 0.2, 1.0, 4.18, F + 0.6, 2.92, 0.07),
+      rb(2.5, F + 0.44, 2.48, 3.14, F + 0.76, 2.66, 0.07), rb(3.28, F + 0.44, 2.48, 3.92, F + 0.76, 2.66, 0.07));
+    P.add('rouge', rb(1.68, F + 0.44, 2.26, 2.04, F + 0.74, 2.5, 0.06));
+    P.add('rug', rb(3.3, F + 0.44, 1.06, 3.92, F + 0.475, 1.52, 0.015));
+    // two round tables: stone tops on three steel legs each
+    for (const [x, z, r, h] of [[2.45, 1.05, 0.44, 0.34], [3.2, 0.5, 0.29, 0.26]]) {
+      P.add('bright', cyl(r, 0.028, x, F + h, z, 48));
+      for (const a of [0.5, 2.6, 4.7]) P.add('steel', cyl(0.012, h - 0.012, x + Math.cos(a) * r * 0.62, F + 0.012, z + Math.sin(a) * r * 0.62, 8));
+    }
+    P.add('book1', bx(2.22, F + 0.368, 0.9, 2.5, F + 0.4, 1.1));
+    P.add('book2', bx(2.25, F + 0.4, 0.92, 2.48, F + 0.425, 1.08));
+    P.add('soft', cyl(0.07, 0.06, 2.72, F + 0.368, 1.18, 24, 0.11), cyl(0.045, 0.07, 3.2, F + 0.288, 0.5, 16));
+    // the lounge chair: steel sled frame, oak arm pads, red upholstery
+    for (const z of [1.57, 2.21]) {
+      P.add('steel', bx(0.62, F + 0.012, z, 1.3, F + 0.04, z + 0.03), bx(0.62, F + 0.04, z, 0.65, F + 0.56, z + 0.03), bx(1.27, F + 0.04, z, 1.3, F + 0.56, z + 0.03));
+      P.add('oak', bx(0.6, F + 0.56, z - 0.015, 1.32, F + 0.595, z + 0.045));
+    }
+    P.add('steel', bx(0.7, F + 0.22, 1.6, 1.26, F + 0.26, 2.21));
+    P.add('rouge', rb(0.72, F + 0.26, 1.61, 1.28, F + 0.43, 2.2, 0.06), rb(0.64, F + 0.3, 1.61, 0.82, F + 0.9, 2.2, 0.07));
+    // a lamp beside the sofa and the pool of light it throws; the glow of the fire on the boards
+    P.add('steel', cyl(0.15, 0.02, 1.16, F + 0.012, 2.72, 24), cyl(0.012, 1.42, 1.16, F + 0.032, 2.72, 12));
+    P.add('shade', cyl(0.17, 0.24, 1.16, F + 1.36, 2.72, 28, 0.12));
+    P.add('pool', cyl(0.85, 0.002, 1.3, F + 0.013, 2.4, 40));
+    for (const [rx, rz] of [[0.85, 1.25], [0.6, 0.95], [0.36, 0.62]]) P.add('firepool', new THREE.CylinderGeometry(1, 1, 0.002, 40).scale(rx, 1, rz).translate(1.7, F + 0.002, -2.1));
+    // sideboard on the north wall: a turntable, books, a lamp
+    P.add('oak', bx(1.7, F + 0.16, -ZI, 3.0, F + 0.62, -2.98));
+    for (const x of [1.78, 2.92]) for (const z of [-3.36, -3.06]) P.add('steel', bx(x - 0.02, F, z - 0.02, x + 0.02, F + 0.16, z + 0.02));
+    P.add('steel', bx(1.8, F + 0.62, -3.36, 2.24, F + 0.67, -3.04), cyl(0.15, 0.012, 2.02, F + 0.67, -3.2, 32));
+    P.add('book1', bx(2.36, F + 0.62, -3.34, 2.42, F + 0.86, -3.12));
+    P.add('book2', bx(2.42, F + 0.62, -3.34, 2.47, F + 0.9, -3.12), bx(2.52, F + 0.62, -3.34, 2.56, F + 0.84, -3.12));
+    P.add('book3', bx(2.47, F + 0.62, -3.34, 2.52, F + 0.88, -3.12));
+    P.add('soft', cyl(0.05, 0.14, 2.82, F + 0.62, -3.2, 18));
+    P.add('shade', cyl(0.13, 0.17, 2.82, F + 0.76, -3.2, 28, 0.085));
+    // a rubber tree by the glass, drawn leaf by leaf
+    P.add('bright', cyl(0.16, 0.4, 4.32, F, -2.92, 40, 0.22));
+    P.add('oak', cyl(0.016, 1.35, 4.32, F + 0.38, -2.92, 8));
+    const leaf = new THREE.Shape(); leaf.absellipse(0, 0.2, 0.095, 0.2, 0, Math.PI * 2, false);
+    for (let i = 0; i < 12; i++) {
+      const h = F + 0.72 + i * 0.09, a = i * 2.2 + 0.4, th = 0.95 - (i % 3) * 0.18, k = 0.8 + ((i * 5) % 4) * 0.09;
+      const g = new THREE.ExtrudeGeometry(leaf, { depth: 0.004, bevelEnabled: false, curveSegments: 20 });
+      g.scale(k, k, 1); g.applyMatrix4(new THREE.Matrix4().makeRotationY(a).multiply(new THREE.Matrix4().makeRotationX(th)));
+      g.translate(4.32, h, -2.92); P.add('leaf', g);
+    }
+
+    // -- dining: an oak top on two steel frames, six chairs, a few things on the table
+    P.add('oak', bx(-2.6, F + 0.71, 1.4, -0.4, F + 0.75, 2.4));
+    for (const x of [-2.3, -0.7]) {
+      P.add('steel', bx(x - 0.02, F, 1.52, x + 0.02, F + 0.03, 2.28), bx(x - 0.02, F + 0.68, 1.52, x + 0.02, F + 0.71, 2.28),
+        bx(x - 0.02, F + 0.03, 1.52, x + 0.02, F + 0.68, 1.56), bx(x - 0.02, F + 0.03, 2.24, x + 0.02, F + 0.68, 2.28));
+    }
+    const chair = (cx, cz, s) => {          // s = +1: the sitter looks south
+      const zb = cz - s * 0.185;
+      P.add('oak', bx(cx - 0.21, F + 0.43, cz - 0.2, cx + 0.21, F + 0.46, cz + 0.2), bx(cx - 0.2, F + 0.63, zb + s * 0.011, cx + 0.2, F + 0.85, zb + s * 0.03));
+      for (const dx of [-0.185, 0.185]) {
+        P.add('steel', bx(cx + dx - 0.011, F, cz + s * 0.17 - 0.011, cx + dx + 0.011, F + 0.43, cz + s * 0.17 + 0.011),
+          bx(cx + dx - 0.011, F, zb - 0.011, cx + dx + 0.011, F + 0.43, zb + 0.011), bx(cx + dx - 0.011, F + 0.46, zb - 0.011, cx + dx + 0.011, F + 0.86, zb + 0.011));
+      }
+    };
+    for (const x of [-2.15, -1.5, -0.85]) { chair(x, 1.16, 1); chair(x, 2.64, -1); }
+    P.add('bright', cyl(0.1, 0.07, -1.5, F + 0.75, 1.9, 32, 0.19));
+    P.add('soft', cyl(0.045, 0.2, -1.02, F + 0.75, 1.78, 18, 0.03), cyl(0.035, 0.09, -0.9, F + 0.75, 1.98, 14), cyl(0.035, 0.09, -2.0, F + 0.75, 1.82, 14));
+    P.add('book1', bx(-2.32, F + 0.75, 1.96, -2.06, F + 0.78, 2.16));
+    // three stools under the overhang of the island
+    for (const x of [-2.7, -2.1, -1.5]) {
+      P.add('oak', cyl(0.165, 0.035, x, F + 0.63, -0.44, 28));
+      P.add('steel', cyl(0.016, 0.61, x, F + 0.02, -0.44, 10), cyl(0.15, 0.02, x, F, -0.44, 24));
+    }
+    // floor boards, drawn as hatching; the deck boards run across the terrace
+    const boards = [];
+    for (let z = -ZI + 0.18; z < ZI; z += 0.18) for (let x = XW + TH; x < XI; x += 2.42) boards.push([x, F + 0.001, z, Math.min(x + 2.42, XI), F + 0.001, z]);
+    for (let z = -ZO + 0.14; z < ZO; z += 0.14) boards.push([XE + 0.03, FL + 0.001, z, 8.2, FL + 0.001, z]);
+    segs(L1.g, boards, hatchMat);
+  }
+
+  // =====================================================================================================
+  // 02 Ground floor: CLT walls, the glulam portal of the glass front, the chimney block, the kitchen, the stair
+  const L2 = layer('eg', '02', 'Erdgeschoss', 'Brettsperrholz, 160 mm', 2);
+  const flames = [];
+  {
+    const P = L2.part, joints = [];
+    const long = [[XW + TH, 0], [XE, 0], [XE, EH], [XW + TH, EH]];
+    P.add('wall', panel(long, S1.map(hole(FL)), TH).applyMatrix4(M.alongX(ZI, FL)));
+    P.add('wall', panel(long, N1.map(hole(FL)), TH).applyMatrix4(M.alongX(-ZO, FL)));
+    P.add('wall', panel([[-ZO, 0], [ZO, 0], [ZO, EH], [-ZO, EH]], W1.map(hole(FL)), TH).applyMatrix4(M.alongZ(XW + TH, FL)));
+    // the east front is a glulam portal: a lintel on two posts
+    P.add('rafter', bx(XI, YL, -ZI, XE, Y1, ZI), bx(XI, FL, DW, XE, YL, DW + 0.12), bx(XI, FL, -DW - 0.12, XE, YL, -DW));
+    P.add('steel', bx(XI - 0.012, YL - 0.1, DW - 0.01, XI, YL + 0.12, DW + 0.13), bx(XI - 0.012, YL - 0.1, -DW - 0.13, XI, YL + 0.12, -DW + 0.01));
+
+    // the chimney block: board-marked concrete with a fire chamber in its east face, a bench in front
+    P.add('concrete', bx(BX0, F, -ZI, 0.5, Y1, BZ),
+      bx(0.5, F, -ZI, BX1, F + 0.5, BZ), bx(0.5, F + 1.05, -ZI, BX1, Y1, BZ),
+      bx(0.5, F + 0.5, -ZI, BX1, F + 1.05, -2.7), bx(0.5, F + 0.5, -1.5, BX1, F + 1.05, BZ),
+      bx(BX1, F, -ZI, 1.3, F + 0.4, BZ));
+    P.add('steel', bx(0.5, F + 0.5, -2.7, 0.512, F + 1.05, -1.5), bx(0.512, F + 0.5, -2.7, BX1, F + 0.512, -1.5));
+    P.add('ember', bx(0.56, F + 0.512, -2.56, 0.74, F + 0.535, -1.64));
+    P.add('oak', lying(0.045, 0.62, 0.62, F + 0.58, -2.3), lying(0.04, 0.55, 0.69, F + 0.575, -1.95), lying(0.04, 0.7, 0.65, F + 0.665, -2.1));
+    const fl = new THREE.Shape(); fl.moveTo(0, 0); fl.bezierCurveTo(0.075, 0.02, 0.07, 0.14, 0.012, 0.3); fl.bezierCurveTo(-0.06, 0.15, -0.075, 0.03, 0, 0);
+    [[-2.42, 0.95, 0.62], [-2.26, 1.25, 0.66], [-2.1, 1.05, 0.6], [-1.96, 1.3, 0.68], [-1.82, 0.9, 0.63], [-2.18, 0.8, 0.72], [-2.02, 0.75, 0.57]].forEach(([z, k, x], i) => {
+      const g = new THREE.ExtrudeGeometry(fl, { depth: 0.003, bevelEnabled: false, curveSegments: 14 });
+      g.rotateY(-Math.PI / 2);
+      const m = new THREE.Mesh(g, flameMat); m.position.set(x, F + 0.535, z); m.userData = { k, i }; L2.g.add(m); flames.push(m);
+    });
+    P.add('cushion', rb(0.84, F + 0.4, -3.36, 1.26, F + 0.47, -2.2, 0.03));
+    for (const [y, z] of [[0.045, -1.36], [0.045, -1.26], [0.045, -1.16], [0.125, -1.31], [0.125, -1.21], [0.205, -1.26]]) P.add('oak', lying(0.045, 0.4, 1.05, F + 0.4 + y, z, 'x'));
+    // board marks on the block
+    for (let y = F + 1.6; y < Y1 - 0.2; y += 0.55) joints.push([BX1 + 0.002, y, -ZI, BX1 + 0.002, y, BZ], [BX0 - 0.002, y, -2.82, BX0 - 0.002, y, BZ]);
+    for (const y of [F + 1.05]) joints.push([BX0 - 0.002, y, -2.82, BX0 - 0.002, y, BZ]);
+
+    // kitchen: a tall wall of fronts under the landing, a base run along the north wall, the island
+    P.add('steel', bx(XW + TH, F, -ZI, -4.28, F + 0.08, -1.44), bx(-4.24, F, -ZI, BX0, F + 0.08, -2.88), bx(-3.06, F, -1.71, -1.14, F + 0.08, -0.89));
+    P.add('kfront', bx(XW + TH, F + 0.08, -ZI, -4.24, F + 2.3, -1.44), bx(-4.24, F + 0.08, -ZI, BX0, F + 0.86, -2.84), bx(-3.1, F + 0.08, -1.75, -1.1, F + 0.86, -0.85));
+    P.add('bright', bx(-4.24, F + 0.86, -ZI, BX0, F + 0.9, -2.82), bx(-3.16, F + 0.86, -1.8, -1.04, F + 0.9, -0.52));
+    P.add('steel', bx(-4.24, F + 0.92, -2.92, -4.228, F + 1.48, -2.36), bx(-4.228, F + 1.5, -2.9, -4.2, F + 1.515, -2.38),
+      bx(-2.6, F + 0.9, -3.3, -1.95, F + 0.906, -2.94), cyl(0.014, 0.27, -2.28, F + 0.9, -3.36, 12), bar(V(-2.28, F + 1.16, -3.371), V(-2.28, F + 1.16, -3.14), 0.022, 0.022),
+      bx(-2.55, F + 0.9, -1.6, -1.7, F + 0.906, -1.08));
+    P.add('oak', bx(-0.95, F + 1.5, -ZI, 0.15, F + 1.535, -3.2), bx(-1.5, F + 0.9, -1.5, -1.18, F + 0.925, -1.06));
+    P.add('soft', cyl(0.06, 0.15, -0.72, F + 1.535, -3.31, 20), cyl(0.05, 0.12, -0.54, F + 1.535, -3.31, 20), cyl(0.075, 0.19, -0.1, F + 1.535, -3.31, 24, 0.04),
+      cyl(0.09, 0.07, -2.86, F + 0.9, -1.22, 32, 0.16));
+    P.add('rouge', cyl(0.085, 0.13, -0.5, F + 0.9, -3.14, 24, 0.07), ball(0.043, -2.9, F + 0.99, -1.25), ball(0.043, -2.81, F + 0.99, -1.2), ball(0.043, -2.86, F + 1.0, -1.15));
+    for (const z of [-2.94, -2.36, -1.94]) joints.push([-4.239, F + 0.1, z, -4.239, F + 2.28, z]);
+    joints.push([-4.239, F + 0.9, -2.94, -4.239, F + 0.9, -2.36]);
+    for (let x = -3.64; x < 0.1; x += 0.6) joints.push([x, F + 0.1, -2.839, x, F + 0.84, -2.839]);
+    joints.push([-4.24, F + 0.72, -2.839, BX0, F + 0.72, -2.839]);
+    for (const x of [-2.6, -2.1, -1.6]) joints.push([x, F + 0.1, -0.849, x, F + 0.84, -0.849], [x, F + 0.1, -1.751, x, F + 0.84, -1.751]);
+
+    // the stair: a folded oak flight on a closed cupboard, steel rods from the treads up past the ceiling
+    const prof = [[SZ, F]];
+    for (let i = 1; i < NR; i++) prof.push([SZ - (i - 1) * GO, F + i * RS], [SZ - i * GO, F + i * RS]);
+    const SL = RS / GO, soff = F + (NR - 1) * RS - 0.24, zf = STOP + (soff - F) / SL;
+    prof.push([STOP, soff], [zf, F]);
+    P.add('oak', panel(prof, [], SX1 - SX0).applyMatrix4(M.alongZ(SX1, 0)));
+    P.add('ceil', panel([[zf, F], [STOP, F], [STOP, soff]], [], 0.05).applyMatrix4(M.alongZ(SX1, 0)), bx(SX0, F, STOP - 0.05, SX1, soff, STOP));
+    for (let k = 1; k <= 4; k++) { const z = lerp(zf, STOP, k / 5); joints.push([SX1 + 0.002, F + 0.03, z, SX1 + 0.002, F + (zf - z) * SL - 0.03, z]); }
+    for (let i = 1; i <= 12; i++) for (const d of [0.07, 0.2]) P.add('rod', bx(SX1 - 0.039, F + i * RS, SZ - (i - 1) * GO - d - 0.008, SX1 - 0.023, Y2, SZ - (i - 1) * GO - d + 0.008));
+    P.add('steel', bar(V(SX0 + 0.06, F + 0.95, SZ + 0.1), V(SX0 + 0.06, F2 + 0.95, STOP - 0.1), 0.04, 0.04));
+    for (const u of [0.04, 0.5, 0.96]) { const z = lerp(SZ + 0.1, STOP - 0.1, u), y = lerp(F + 0.95, F2 + 0.95, u); P.add('steel', bx(SX0, y - 0.05, z - 0.012, SX0 + 0.06, y - 0.03, z + 0.012)); }
+
+    // panel joints of the CLT walls
+    for (const x of [-2.4, 0.05, 2.5]) joints.push([x, FL, ZO + 0.002, x, Y1, ZO + 0.002], [x, FL, -ZO - 0.002, x, Y1, -ZO - 0.002]);
+    segs(L2.g, joints, hatchMat);
+  }
+
+  // =====================================================================================================
+  // 03 Upper floor: the CLT ceiling with its stair opening, knee walls and gables, the studio under the roof
+  const L3 = layer('og', '03', 'Obergeschoss', 'BSP-Decke 200 mm, Kniestock 1,40 m', 3);
+  {
+    const P = L3.part, joints = [];
+    P.add('ceil', panel([[XW, -ZO], [XE, -ZO], [XE, ZO], [XW, ZO]], [[[SX0, -ZI], [SX1, -ZI], [SX1, -STOP], [SX0, -STOP]]], CS).applyMatrix4(M.flat(Y1)));
+    P.add('floor', panel([[SX1, -ZI], [XI, -ZI], [XI, ZI], [SX0, ZI], [SX0, -STOP], [SX1, -STOP]], [], F2 - Y2).applyMatrix4(M.flat(Y2)));
+    const knee = [[XW + TH, 0], [XI, 0], [XI, KH], [XW + TH, KH]];
+    P.add('wall', panel(knee, S2.map(hole(Y2)), TH).applyMatrix4(M.alongX(ZI, Y2)));
+    P.add('wall', panel(knee, N2.map(hole(Y2)), TH).applyMatrix4(M.alongX(-ZO, Y2)));
+    // gables with a pocket for the ridge beam
+    const gt = z => UL(z) - Y2;
+    const gable = [[-ZO, 0], [ZO, 0], [ZO, gt(ZO)], [0.09, gt(0.09)], [0.09, gt(0) - 0.3], [-0.09, gt(0) - 0.3], [-0.09, gt(0.09)], [-ZO, gt(ZO)]];
+    P.add('wall', panel(gable, W2.map(hole(Y2)), TH).applyMatrix4(M.alongZ(XW + TH, Y2)));
+    P.add('wall', panel(gable, E2.map(hole(Y2)), TH).applyMatrix4(M.alongZ(XE, Y2)));
+    P.add('rafter', bx(XW + TH, YP, ZI, XI, YP + PL, ZO), bx(XW + TH, YP, -ZO, XI, YP + PL, -ZI));
+
+    // the guard along the stair opening
+    for (let z = STOP + 0.09; z < ZI - 0.02; z += 0.13) P.add('rod', bx(SX1 + 0.03, F2, z - 0.008, SX1 + 0.046, F2 + 0.98, z + 0.008));
+    P.add('steel', bx(SX1 + 0.014, F2 + 0.98, STOP - 0.02, SX1 + 0.062, F2 + 1.02, ZI), bx(SX1 + 0.014, F2, STOP - 0.02, SX1 + 0.062, F2 + 0.98, STOP + 0.028));
+    // the flue of the chimney block comes up through the room
+    P.add('pipe', cyl(0.11, UL(PIPE[1]) - 0.03 - F2, PIPE[0], F2, PIPE[1], 28), cyl(0.17, 0.02, PIPE[0], F2, PIPE[1], 28));
+
+    // sleeping, east: the bed stands under the gable window on a rug, two side tables, a dresser under the eave
+    P.add('rug', bx(2.1, F2, -1.75, 4.7, F2 + 0.012, 1.75));
+    P.add('oak', bx(4.66, F2 + 0.012, -1.1, 4.78, F2 + 0.8, 1.1), bx(2.56, F2 + 0.012, -0.97, 4.66, F2 + 0.24, 0.97));
+    P.add('cushion', rb(2.6, F2 + 0.24, -0.92, 4.62, F2 + 0.47, 0.92, 0.07),
+      rb(4.14, F2 + 0.47, -0.84, 4.58, F2 + 0.64, -0.06, 0.06), rb(4.14, F2 + 0.47, 0.06, 4.58, F2 + 0.64, 0.84, 0.06));
+    P.add('rouge', rb(2.72, F2 + 0.25, -0.95, 3.3, F2 + 0.5, 0.95, 0.05), rb(3.84, F2 + 0.47, -0.3, 4.1, F2 + 0.62, 0.3, 0.05));
+    for (const s of [-1, 1]) {
+      P.add('oak', cyl(0.2, 0.03, 4.46, F2 + 0.42, s * 1.32, 32));
+      P.add('steel', cyl(0.018, 0.4, 4.46, F2 + 0.02, s * 1.32, 10), cyl(0.14, 0.012, 4.46, F2 + 0.012, s * 1.32, 24));
+    }
+    P.add('soft', cyl(0.05, 0.14, 4.46, F2 + 0.45, -1.32, 18));
+    P.add('shade', cyl(0.13, 0.17, 4.46, F2 + 0.59, -1.32, 28, 0.085));
+    P.add('book1', bx(4.34, F2 + 0.45, 1.22, 4.58, F2 + 0.48, 1.42));
+    P.add('book2', bx(4.36, F2 + 0.48, 1.24, 4.57, F2 + 0.505, 1.4));
+    P.add('oak', bx(1.9, F2 + 0.012, -ZI, 4.1, F2 + 0.72, -2.96));
+    for (const x of [2.63, 3.37]) joints.push([x, F2 + 0.03, -2.959, x, F2 + 0.7, -2.959]);
+    joints.push([1.9, F2 + 0.37, -2.959, 4.1, F2 + 0.37, -2.959]);
+    P.add('soft', cyl(0.09, 0.22, 2.2, F2 + 0.72, -3.2, 24, 0.05), cyl(0.08, 0.05, 3.7, F2 + 0.72, -3.2, 28, 0.12));
+    P.add('book3', bx(2.9, F2 + 0.72, -3.32, 3.2, F2 + 0.75, -3.1));
+    P.add('book1', bx(2.92, F2 + 0.75, -3.31, 3.18, F2 + 0.775, -3.11));
+
+    // working, south: a desk under the strip window, a red chair, a lamp, an open laptop
+    P.add('oak', bx(-2.8, F2 + 0.71, 2.55, -0.6, F2 + 0.75, 3.36));
+    for (const x of [-2.6, -0.8]) P.add('steel', bx(x - 0.02, F2 + 0.012, 2.62, x + 0.02, F2 + 0.04, 3.3), bx(x - 0.02, F2 + 0.68, 2.62, x + 0.02, F2 + 0.71, 3.3),
+      bx(x - 0.02, F2 + 0.04, 2.62, x + 0.02, F2 + 0.68, 2.66), bx(x - 0.02, F2 + 0.04, 3.26, x + 0.02, F2 + 0.68, 3.3));
+    P.add('steel', bx(-1.98, F2 + 0.75, 2.84, -1.42, F2 + 0.764, 3.18), bar(V(-1.7, F2 + 0.766, 3.19), V(-1.7, F2 + 1.08, 3.28), 0.56, 0.012),
+      cyl(0.075, 0.015, -0.86, F2 + 0.75, 3.12, 20), cyl(0.008, 0.36, -0.86, F2 + 0.765, 3.12, 8), bar(V(-0.86, F2 + 1.125, 3.12), V(-1.1, F2 + 1.2, 2.95), 0.014, 0.014));
+    P.add('shade', cyl(0.085, 0.1, -1.14, F2 + 1.09, 2.92, 24, 0.045));
+    P.add('book2', bx(-2.6, F2 + 0.75, 2.9, -2.3, F2 + 0.78, 3.14));
+    P.add('book1', bx(-2.58, F2 + 0.78, 2.92, -2.33, F2 + 0.805, 3.12));
+    P.add('soft', cyl(0.04, 0.09, -2.16, F2 + 0.75, 3.14, 14));
+    P.add('steel', cyl(0.24, 0.02, -1.7, F2 + 0.012, 2.1, 5), cyl(0.02, 0.4, -1.7, F2 + 0.03, 2.1, 10));
+    P.add('rouge', rb(-1.93, F2 + 0.43, 1.88, -1.47, F2 + 0.5, 2.32, 0.03), rb(-1.92, F2 + 0.5, 1.84, -1.48, F2 + 0.92, 1.9, 0.025));
+
+    // reading: a long bookcase under the north eave, an easy chair and a side table by the stair
+    const BS = [-3.1, 0.9];
+    for (const y of [0.012, 0.42, 0.82, 1.21]) P.add('oak', bx(BS[0], F2 + y, -ZI, BS[1], F2 + y + 0.035, -3.08));
+    for (const x of [BS[0], -2.1, -1.1, -0.1, BS[1] - 0.035]) P.add('oak', bx(x, F2 + 0.047, -ZI, x + 0.035, F2 + 1.21, -3.08));
+    const rnd = (() => { let s = 7; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); })();
+    for (const [x0, x1] of [[-3.065, -2.1], [-2.065, -1.1], [-1.065, -0.1], [-0.065, 0.865]]) for (const y of [0.047, 0.455, 0.855]) {
+      let x = x0 + 0.02; const end = x1 - 0.12 - rnd() * 0.35;
+      while (x < end) { const w = 0.035 + rnd() * 0.04, h = 0.22 + rnd() * 0.11, k = rnd(); P.add(k < 0.2 ? 'book1' : k < 0.62 ? 'book2' : 'book3', bx(x, F2 + y, -3.38, x + w, F2 + y + h, -3.13)); x += w + 0.004; }
+    }
+    P.add('soft', cyl(0.075, 0.2, 0.4, F2 + 1.245, -3.26, 22, 0.045), cyl(0.07, 0.05, -2.6, F2 + 1.245, -3.26, 24, 0.1));
+    for (const z of [0.2, 0.86]) {
+      P.add('steel', bx(-3.42, F2 + 0.012, z, -2.72, F2 + 0.04, z + 0.03), bx(-3.42, F2 + 0.04, z, -3.39, F2 + 0.54, z + 0.03), bx(-2.75, F2 + 0.04, z, -2.72, F2 + 0.54, z + 0.03));
+      P.add('oak', bx(-3.44, F2 + 0.54, z - 0.015, -2.7, F2 + 0.575, z + 0.045));
+    }
+    P.add('steel', bx(-3.36, F2 + 0.21, 0.23, -2.8, F2 + 0.25, 0.86));
+    P.add('cushion', rb(-3.34, F2 + 0.25, 0.24, -2.78, F2 + 0.42, 0.85, 0.06), rb(-3.4, F2 + 0.29, 0.24, -3.22, F2 + 0.88, 0.85, 0.07));
+    P.add('oak', cyl(0.19, 0.03, -3.0, F2 + 0.44, 1.4, 32));
+    P.add('steel', cyl(0.018, 0.42, -3.0, F2 + 0.02, 1.4, 10), cyl(0.13, 0.012, -3.0, F2 + 0.012, 1.4, 24));
+    P.add('book1', bx(-3.1, F2 + 0.47, 1.32, -2.88, F2 + 0.5, 1.5));
+
+    // two globes hang from the ceiling over the dining table and ride with it
+    for (const x of [-2.05, -0.95]) {
+      P.add('steel', cyl(0.006, Y1 - (F + 1.62), x, F + 1.62, 1.9, 8), cyl(0.045, 0.02, x, Y1 - 0.02, 1.9, 16));
+      P.add('shade', ball(0.15, x, F + 1.5, 1.9, 3));
+    }
+    // upper floor boards, drawn as hatching
+    const boards = [];
+    for (let z = -ZI + 0.18; z < ZI; z += 0.18) {
+      const x0 = z > STOP ? SX1 : SX0;
+      for (let x = x0; x < XI; x += 2.42) boards.push([x, F2 + 0.001, z, Math.min(x + 2.42, XI), F2 + 0.001, z]);
+    }
+    for (const x of [-2.4, 0.05, 2.5]) joints.push([x, Y2, ZO + 0.002, x, YP, ZO + 0.002], [x, Y2, -ZO - 0.002, x, YP, -ZO - 0.002]);
+    for (const x of [-3.2, -1.2, 0.95, 2.9]) joints.push([x, Y1 - 0.002, -ZI, x, Y1 - 0.002, 0], [x, Y1 - 0.002, 0, x, Y1 - 0.002, ZI]);
+    segs(L3.g, [...boards, ...joints], hatchMat);
+  }
+
+  // =====================================================================================================
+  // 04 Glazing, pulled out sideways from its own storey: the sliding glass front, the windows
+  const L4 = layer('glazing', '04', 'Verglasung', 'Hebeschiebetür 3,40 m, Dreifachglas', null);
+  const gE1 = L4.side(V(1, 0, 0), 2), gS1 = L4.side(V(0, 0, 1), 2), gN1 = L4.side(V(0, 0, -1), 2), gW1 = L4.side(V(-1, 0, 0), 2);
+  const gE2 = L4.side(V(1, 0, 0), 3), gS2 = L4.side(V(0, 0, 1), 3), gN2 = L4.side(V(0, 0, -1), 3), gW2 = L4.side(V(-1, 0, 0), 3);
+  const leafN = L4.side(V(1, 0, 0), 2), leafS = L4.side(V(1, 0, 0), 2);
+  {
+    // fixed panes either side of the posts, a steel track below and a rail above for the leaves
+    for (const s of [-1, 1]) {
+      const z0 = s > 0 ? DW + 0.12 : -ZI, z1 = s > 0 ? ZI : -DW - 0.12;
+      gE1.part.add('frame', bx(XI + 0.03, FL, z0, XI + 0.11, FL + 0.07, z1), bx(XI + 0.03, YL - 0.06, z0, XI + 0.11, YL, z1),
+        bx(XI + 0.03, FL + 0.07, z0, XI + 0.11, YL - 0.06, z0 + 0.05), bx(XI + 0.03, FL + 0.07, z1 - 0.05, XI + 0.11, YL - 0.06, z1));
+      gE1.part.add('glass', bx(XI + 0.06, FL + 0.07, z0 + 0.05, XI + 0.08, YL - 0.06, z1 - 0.05));
+    }
+    gE1.part.add('steel', bx(XE + 0.004, FL, -ZI, XE + 0.1, FL + 0.012, ZI), bx(XE + 0.004, YL - 0.03, -ZI, XE + 0.11, YL + 0.07, ZI));
+    for (const [side, s] of [[leafN, -1], [leafS, 1]]) {
+      const z0 = s > 0 ? 0.003 : -DW - 0.06, z1 = s > 0 ? DW + 0.06 : -0.003, y0 = FL + 0.014, y1 = YL - 0.032, f = 0.07;
+      side.part.add('redframe', bx(XE + 0.03, y0, z0, XE + 0.085, y0 + f, z1), bx(XE + 0.03, y1 - f, z0, XE + 0.085, y1, z1),
+        bx(XE + 0.03, y0 + f, z0, XE + 0.085, y1 - f, z0 + f), bx(XE + 0.03, y0 + f, z1 - f, XE + 0.085, y1 - f, z1));
+      side.part.add('glass', bx(XE + 0.048, y0 + f, z0 + f, XE + 0.068, y1 - f, z1 - f));
+      const hz = s > 0 ? z0 + 0.035 : z1 - 0.035;
+      side.part.add('steel', bx(XE + 0.085, FL + 0.85, hz - 0.012, XE + 0.1, FL + 1.35, hz + 0.012));
+    }
+    // windows: a frame in the wall's thickness, mullions, the pane, a steel cill on the outside
+    function win4(part, axis, w0, w1, [a0, y0, a1, y1], out, mull = 0) {
+      const f = 0.06;
+      const B = axis === 'x' ? (p0, q0, p1, q1, r0, r1) => bx(p0, q0, r0, p1, q1, r1) : (p0, q0, p1, q1, r0, r1) => bx(r0, q0, p0, r1, q1, p1);
+      part.add('frame', B(a0, y0, a1, y0 + f, w0, w1), B(a0, y1 - f, a1, y1, w0, w1), B(a0, y0 + f, a0 + f, y1 - f, w0, w1), B(a1 - f, y0 + f, a1, y1 - f, w0, w1));
+      for (let k = 1; k <= mull; k++) { const a = lerp(a0, a1, k / (mull + 1)); part.add('frame', B(a - 0.025, y0 + f, a + 0.025, y1 - f, w0 + 0.02, w1 - 0.02)); }
+      const m = (w0 + w1) / 2; part.add('glass', B(a0 + f, y0 + f, a1 - f, y1 - f, m - 0.01, m + 0.01));
+      const e = out > 0 ? w1 : w0; part.add('steel', B(a0, y0 - 0.026, a1, y0 - 0.004, Math.min(e, e + out * 0.075), Math.max(e, e + out * 0.075)));
+    }
+    S1.forEach((o, i) => win4(gS1.part, 'x', ZI, ZO, o, 1, i ? 1 : 2));
+    N1.forEach((o, i) => win4(gN1.part, 'x', -ZO, -ZI, o, -1, i ? 0 : 1));
+    for (const o of W1) win4(gW1.part, 'z', XW, XW + TH, o, -1);
+    for (const o of S2) win4(gS2.part, 'x', ZI, ZO, o, 1, 1);
+    for (const o of N2) win4(gN2.part, 'x', -ZO, -ZI, o, -1, 1);
+    for (const o of W2) win4(gW2.part, 'z', XW, XW + TH, o, -1, 1);
+    for (const o of E2) win4(gE2.part, 'z', XI, XE, o, 1, 2);
+  }
+
+  // =====================================================================================================
+  // 05 Cladding: vertical charred larch boards, one band per storey, pulled out from each wall
+  const L5 = layer('cladding', '05', 'Fassade', 'Kohlelärche senkrecht, 22 × 140', null);
+  const cS1 = L5.side(V(0, 0, 1), 2), cN1 = L5.side(V(0, 0, -1), 2), cW1 = L5.side(V(-1, 0, 0), 2);
+  const cS2 = L5.side(V(0, 0, 1), 3), cN2 = L5.side(V(0, 0, -1), 3), cW2 = L5.side(V(-1, 0, 0), 3), cE2 = L5.side(V(1, 0, 0), 3);
+  const BW = 0.14, BG = 0.026, C0 = FL - 0.25, CM = Y1 + 0.1, CT = YP + PL - 0.06, D0 = 0.03, D1 = 0.052;
+  {
+    function boards(holes, a0, a1, base, top) {
+      const out = [];
+      for (let a = a0; a + BW <= a1 + 1e-6; a += BW + BG) {
+        const b = a + BW; let spans = [[base, top(a, b)]];
+        for (const [u0, v0, u1, v1] of holes) {
+          if (b > u0 && a < u1) spans = spans.flatMap(([s, e]) => [[s, Math.min(e, v0 - 0.03)], [Math.max(s, v1 + 0.03), e]]).filter(([s, e]) => e - s > 0.05);
+        }
+        for (const [s, e] of spans) out.push([a, b, s, e]);
+      }
+      return out;
+    }
+    const X0 = XW - D1;
+    for (const [a, b, s, e] of boards(S1, X0, XE, C0, () => CM)) cS1.part.add('clad', bx(a, s, ZO + D0, b, e, ZO + D1));
+    for (const [a, b, s, e] of boards(N1, X0, XE, C0, () => CM)) cN1.part.add('clad', bx(a, s, -ZO - D1, b, e, -ZO - D0));
+    for (const [a, b, s, e] of boards(W1, -ZO - D0, ZO + D0, C0, () => CM)) cW1.part.add('clad', bx(XW - D1, s, a, XW - D0, e, b));
+    for (const [a, b, s, e] of boards(S2, X0, XE + D1, CM + 0.02, () => CT)) cS2.part.add('clad', bx(a, s, ZO + D0, b, e, ZO + D1));
+    for (const [a, b, s, e] of boards(N2, X0, XE + D1, CM + 0.02, () => CT)) cN2.part.add('clad', bx(a, s, -ZO - D1, b, e, -ZO - D0));
+    const gTop = (a, b) => UL(Math.max(Math.abs(a), Math.abs(b))) - 0.05;
+    for (const [a, b, s, e] of boards(W2, -ZO - D0, ZO + D0, CM + 0.02, gTop)) cW2.part.add('clad', bx(XW - D1, s, a, XW - D0, e, b));
+    for (const [a, b, s, e] of boards(E2, -ZO - D0, ZO + D0, Y1 + 0.006, gTop)) cE2.part.add('clad', bx(XE + D0, s, a, XE + D1, e, b));
+    // drip flashings close the joint between the two bands and sit over the glass front
+    cS2.part.add('steel', bx(X0, CM - 0.004, ZO + D0, XE + D1, CM + 0.016, ZO + 0.07));
+    cN2.part.add('steel', bx(X0, CM - 0.004, -ZO - 0.07, XE + D1, CM + 0.016, -ZO - D0));
+    cW2.part.add('steel', bx(XW - 0.07, CM - 0.004, -ZO - D0, XW - D0, CM + 0.016, ZO + D0));
+    cE2.part.add('steel', bx(XE + 0.004, Y1 - 0.018, -ZO - D0, XE + 0.075, Y1 + 0.002, ZO + D0));
+  }
+
+  // =====================================================================================================
+  // 06 Roof structure and 07 Roof: every piece is cut plumb at the ridge and square at the eave
+  // a box in the plane of a slope: w above the rafter line, t down the slope from the ridge
+  const sb = (side, x0, x1, w0, w1, t0, t1) => {
     const m = new THREE.Matrix4();
-    if (side > 0) m.makeBasis(V(1, 0, 0), V(0, c, s), V(0, -s, c)); else m.makeBasis(V(-1, 0, 0), V(0, c, -s), V(0, -s, -c));
-    return m.setPosition(0, Y0, 0);
+    if (side > 0) m.makeBasis(V(1, 0, 0), V(0, CP, SP), V(0, -SP, CP)); else m.makeBasis(V(-1, 0, 0), V(0, CP, -SP), V(0, -SP, -CP));
+    return (side > 0 ? bx(x0, w0, t0, x1, w1, t1) : bx(-x1, w0, t0, -x0, w1, t1)).applyMatrix4(m.setPosition(0, Y0, 0));
   };
-  const MS = slopeM(1), MN = slopeM(-1);
-  const sb = (side, x0, x1, w0, w1, t0, t1) => (side > 0 ? bx(x0, w0, t0, x1, w1, t1) : bx(-x1, w0, t0, -x0, w1, t1)).applyMatrix4(side > 0 ? MS : MN);
-  const L5 = layer('rafters', '05', 'Dachtragwerk', 'BSH-Firstpfette, Sparren alle 600 mm', 3);
-  for (const side of [1, -1]) {
-    for (let x = -XR + 0.04; x <= XR; x += 0.6) L5.part.add('rafter', sb(side, x - 0.04, x + 0.04, 0, 0.22, -0.22 * TP, T));
-    L5.part.add('rafter', sb(side, -XR, XR, 0, 0.22, T - 0.03, T));
+  const L6 = layer('rafters', '06', 'Dachtragwerk', 'BSH-Firstpfette, Sparren alle 600 mm', 4);
+  {
+    const RX = [-XR + 0.04, XR - 0.04, -4.92, 4.92]; for (let k = 0; k <= 15; k++) RX.push(-4.6 + 0.6 * k);
+    for (const x of RX) for (const side of [1, -1]) L6.part.add('rafter', slope(side, x - 0.04, x + 0.04, 0, 0.22, 0.08, T));
+    for (const side of [1, -1]) L6.part.add('rafter', sb(side, -XR, XR, 0, 0.22, T, T + 0.035));     // fascia
+    L6.part.add('rafter', bx(-XR, Y0 - 0.3, -0.08, XR, Y0 + 0.14, 0.08));
+    for (const x of [-2.42, 0.02, 2.42]) L6.part.add('steel', bx(x - 0.05, Y0 - 0.31, -0.09, x + 0.05, Y0 - 0.3, 0.09));
+    // the flue passes between two rafters; two paper lanterns hang from the ridge beam
+    L6.part.add('pipe', cyl(0.11, 0.22 / CP + 0.03, PIPE[0], UL(PIPE[1]) - 0.03, PIPE[1], 28));
+    for (const [x, r] of [[3.7, 0.28], [-1.8, 0.22]]) {
+      const y0 = F2 + 2.35;
+      L6.part.add('steel', cyl(0.006, Y0 - 0.3 - y0, x, y0, 0, 8));
+      L6.part.add('shade', ball(r, x, y0 - r + 0.02, 0, 3));
+    }
   }
-  L5.part.add('rafter', bx(-XR, Y0 - 0.28, -0.08, XR, Y0, 0.08));
-  for (const x of [-XR + 0.02, -3.7, 0.2, XG, XR - 0.02]) {
-    L5.part.add('steel', bx(x - 0.05, Y0 - 0.29, -0.09, x + 0.05, Y0 + 0.01, 0.09));
+  const L7 = layer('roof', '07', 'Dach', 'Dämmpaneele, Zink-Stehfalz schwarz', 5);
+  {
+    const tS = (0.2 - 0.44 * SP) / CP;                 // where the standing seams start, clear of the ridge cap
+    for (const side of [1, -1]) {
+      L7.part.add('under', slope(side, -XR, XR, 0.22, 0.42, 0, T + 0.035));
+      L7.part.add('seam', slope(side, -XR - 0.02, XR + 0.02, 0.42, 0.44, 0, T + 0.06));
+      for (let x = -XR + 0.2; x < XR; x += 0.45) L7.part.add('seam', sb(side, x - 0.012, x + 0.012, 0.44, 0.48, tS, T + 0.06));
+      // zinc gutter along each eave
+      L7.part.add('steel', sb(side, -XR - 0.02, XR + 0.02, 0.34, 0.42, T + 0.06, T + 0.14));
+    }
+    // the ridge cap folds over both slopes
+    const YT = Y0 + 0.44 / CP, a = YT - 0.2 * TP;
+    L7.part.add('seam', panel([[-0.2, a], [0, YT], [0.2, a], [0.2, a + 0.04], [0, YT + 0.04], [-0.2, a + 0.04]], [], 2 * XR + 0.06).applyMatrix4(M.alongZ(XR + 0.03, 0)));
+    // the flue leaves through the north slope under a rain cap
+    const yr = UL(PIPE[1]) + 0.22 / CP + 0.03;
+    L7.part.add('pipe', cyl(0.11, YT + 0.75 - yr, PIPE[0], yr, PIPE[1], 28), cyl(0.2, 0.02, PIPE[0], UL(PIPE[1]) + 0.44 / CP + 0.16, PIPE[1], 28, 0.13),
+      cyl(0.17, 0.03, PIPE[0], YT + 0.8, PIPE[1], 28), cyl(0.012, 0.05, PIPE[0], YT + 0.75, PIPE[1], 6));
   }
-  // twin spun-linen pendant lamps suspended from the glulam ridge beam over the oak dining table
-  for (const px of [2.35, 3.25]) {
-    const py0 = F + 1.82, py1 = Y0 - 0.28;
-    L5.part.add('steel', cyl(0.008, py1 - py0, px, py0, 0.22, 8));
-    L5.part.add('shade', cyl(0.20, 0.16, px, py0 - 0.14, 0.22, 32, 0.07));
-  }
-  const L6 = layer('roof', '06', 'Dach', 'Dämmpaneele, Zink-Stehfalz', 4);
-  for (const side of [1, -1]) {
-    L6.part.add('white', sb(side, -XR, XR, 0.22, 0.42, -0.42 * TP, T));
-    L6.part.add('seam', sb(side, -XR - 0.02, XR + 0.02, 0.42, 0.44, -0.44 * TP, T + 0.03));
-    for (let x = -XR + 0.2; x < XR; x += 0.45) L6.part.add('seam', sb(side, x - 0.012, x + 0.012, 0.44, 0.48, -0.48 * TP, T + 0.03));
-    // zinc half-round eave gutter along each roof edge
-    L6.part.add('steel', sb(side, -XR - 0.02, XR + 0.02, 0.36, 0.43, T + 0.03, T + 0.1));
-  }
-  const YT = Y0 + 0.48 / CP;
-  L6.part.add('seam', bx(-XR - 0.03, YT - 0.1, -0.11, XR + 0.03, YT + 0.04, 0.11));
 
   for (const L of layers) { L.part.build(); for (const s of L.subs) s.part.build(); }
 
   // ---- the stack: how far each level floats, and the order things land
-  const LIFT = { 1: 2.3, 2: 4.9, 3: 10.2, 4: 15.6 };
-  const PULL = { glazing: 3.4, cladding: 6.2 };
-  const ORDER = ['floor', 'structure', 'glazing', 'cladding', 'rafters', 'roof'];
-  const T0 = 0.05, STEP = 0.056, DUR = 0.068;
+  const LIFT = { 1: 2.0, 2: 4.3, 3: 9.3, 4: 14.6, 5: 19.6 };
+  const PULL = { glazing: 3.2, cladding: 5.6 };
+  const ORDER = ['floor', 'eg', 'og', 'glazing', 'cladding', 'rafters', 'roof'];
+  const T0 = 0.045, STEP = 0.049, DUR = 0.064;
   const landAt = id => { const i = ORDER.indexOf(id); return [T0 + i * STEP, T0 + i * STEP + DUR]; };
 
-  // ---- labels in a column right of the drawing, each on its layer's north-east corner
+  // ---- labels in a column right of the drawing, each on a corner of its layer
   const anchor = {
-    floor: [L1.g, V(7.5, 0.15, -3.6)],
-    structure: [L2.g, V(XE, FL + EH, ZO)],
-    glazing: [gE.g, V(XG, UL(ZI) - 0.1, -ZI)],
-    cladding: [cN.g, V(6.0, FL + 1.6, -ZO - 0.052)],
-    rafters: [L5.g, V(XR, Y0 + 0.11 * CP - T * SP, -0.11 * SP - T * CP)],
-    roof: [L6.g, V(XR, Y0 + 0.44 * CP - T * SP, -0.44 * SP - T * CP)],
+    floor: [L1.g, V(8.2, FL - 0.1, -ZO)],
+    eg: [L2.g, V(XE, Y1, ZO)],
+    og: [L3.g, V(XE, YP + PL, -ZO)],
+    glazing: [gN2.g, V(N2[0][2], N2[0][3], -ZO)],
+    cladding: [cN2.g, V(XE, CT, -ZO - D1)],
+    rafters: [L6.g, V(XR, Y0 + 0.11 * CP - T * SP, -0.11 * SP - T * CP)],
+    roof: [L7.g, V(XR, Y0 + 0.44 * CP - T * SP, -0.44 * SP - T * CP)],
   };
-  const SHORT = { rafters: 'Sparren' };
+  const SHORT = { rafters: 'Sparren', eg: 'EG', og: 'OG' };
   for (const L of layers) { const [obj, at] = anchor[L.id]; L.label = labels.add({ no: L.no, name: L.name, short: SHORT[L.id], sub: L.sub, obj, at, rank: 10 - Number(L.no) }); }
 
   // ---- dotted lines between the floating layers
   const dash = liveLine(dashMat);
-  const corners = [[-7.4, -3.5], [7.4, -3.5], [7.4, 3.5], [-7.4, 3.5]];
+  const corners = [[XW, -ZO], [XE, -ZO], [XE, ZO], [XW, ZO]];
 
-  // ---- camera: the long lens over the whole stack (0.00..0.41), dolly-zoom to the east porch (0.41..0.62),
-  // then a 4-stop interior walkthrough through Dining (0.71), Living & Hearth (0.80), Oak Mezzanine Loft (0.89), and Ridge Panorama (1.00)
-  const keys = [
-    { at: 0, t: [0.2, 10.2, 0], az: 45, el: 27, fov: 1.5, h: 33, sx: -0.02, ph: { h: 61, sx: -0.24, sy: -0.15 } },
-    { at: 0.39, t: [0.2, 10.2, 0], az: 45, el: 27, fov: 1.5, h: 33, sx: -0.02, ph: { h: 61, sx: -0.24, sy: -0.15 } },
-    { at: 0.48, t: [0.4, 3.2, 0], az: 45, el: 27, fov: 1.5, h: 15, sx: 0.2, ph: { h: 40, sx: 0, sy: -0.3 } },
-    { at: 0.52, t: [0.6, 3.0, 0], az: 42, el: 24, fov: 1.6, h: 14, sx: 0.16, ph: { h: 38, sx: 0, sy: -0.24 } },
-    // Porch arrival (dolly-zoom lands on east deck)
-    eyeKey(0.62, [13.8, 1.62, 0.15], [XG, 1.62, 0], 46, { sy: -0.18, ph: eyeKey(0.62, [14.5, 1.62, 0.15], [XG - 1.5, 1.62, 0], 64, { sy: -0.12 }) }),
-    // Stop 1: Threshold & Oak Trestle Dining Table
-    eyeKey(0.71, [4.75, 1.60, 0.35], [0.2, 1.42, -0.65], 54, { sy: -0.10, ph: eyeKey(0.71, [4.85, 1.60, 0.35], [0.2, 1.42, -0.65], 70, { sy: -0.08 }) }),
-    // Waypoint into north kitchen aisle
-    eyeKey(0.75, [3.1, 1.58, -1.50], [-1.6, 1.32, 0.85], 55, { sy: -0.08, ph: eyeKey(0.75, [3.1, 1.58, -1.50], [-1.6, 1.32, 0.85], 72, { sy: -0.06 }) }),
-    // Stop 2: Kitchen, Sunlit Living Lounge & Glowing Wood Stove
-    eyeKey(0.80, [0.55, 1.50, -1.25], [-2.85, 1.15, 1.35], 56, { sy: -0.06, ph: eyeKey(0.80, [0.55, 1.50, -1.25], [-2.85, 1.15, 1.35], 72, { sy: -0.05 }) }),
-    // Ladder crest waypoint passing through the balustrade opening
-    eyeKey(0.85, [-3.45, 4.22, -2.18], [-6.2, 3.65, -0.2], 56, { sy: -0.05, ph: eyeKey(0.85, [-3.45, 4.22, -2.18], [-6.2, 3.65, -0.2], 72, { sy: -0.04 }) }),
-    // Stop 3: Inside the furnished Oak Mezzanine Loft (+3.20m), unobstructed view of platform bed & west oculus
-    eyeKey(0.89, [-4.05, 4.25, -1.65], [-6.55, 3.60, 0.15], 56, { sy: -0.05, ph: eyeKey(0.89, [-4.05, 4.25, -1.65], [-6.55, 3.60, 0.15], 72, { sy: -0.04 }) }),
-    // Stop 4: Pivot on the loft landing looking back east across the 6.6m-high Long Room & glazed gable
-    eyeKey(0.98, [-3.35, 4.18, -1.55], [5.8, 1.85, 0.25], 58, { sy: -0.06, ph: eyeKey(0.98, [-3.35, 4.18, -1.55], [5.8, 1.85, 0.25], 74, { sy: -0.05 }) }),
-    eyeKey(1.0, [-3.35, 4.18, -1.55], [5.8, 1.85, 0.25], 58, { sy: -0.06, ph: eyeKey(1.0, [-3.35, 4.18, -1.55], [5.8, 1.85, 0.25], 74, { sy: -0.05 }) }),
+  // ---- camera: the long lens over the whole stack (0.00..0.40), dolly-zoom to the terrace (0.40..0.62),
+  // then the walk: threshold, kitchen, stair foot, up the flight, the studio, and back along the ridge.
+  const E1 = F + 1.42, E2Y = F2 + 1.5;
+  const WALK = [
+    { at: 0.620, e: [16.4, E1, 0.1], l: [XE, E1, 0], fov: 46, sy: -0.5, stop: 1, pe: [27.5, E1, 0.1], pf: 50, ps: -0.42 },
+    { at: 0.660, e: [9.2, E1, -0.25], l: [1.0, 1.55, 0.2], fov: 50, sy: -0.24, pe: [11.5, E1, -0.25] },
+    { at: 0.695, e: [5.75, E1, -0.6], l: [0.4, 1.2, 0.7], fov: 56, sy: -0.08, stop: 1 },
+    { at: 0.735, e: [3.0, E1, -0.55], l: [-2.6, 1.2, -0.6], fov: 56, sy: -0.07 },
+    { at: 0.770, e: [1.0, E1, 0.45], l: [-3.4, 1.15, -1.3], fov: 57, sy: -0.06, stop: 1 },
+    { at: 0.800, e: [-1.7, E1, 0.36], l: [-4.4, 1.7, 1.4], fov: 57, sy: -0.06 },
+    { at: 0.818, e: [-3.12, E1, 1.25], l: [-3.9, 1.7, 3.4], fov: 57, sy: -0.05 },
+    { at: 0.832, e: [-3.3, E1, 2.62], l: [-4.6, 2.2, 2.1], fov: 57, sy: -0.05 },
+    { at: 0.848, e: [-4.26, E1 + 0.08, 2.95], l: [-4.36, 3.45, -1.2], fov: 58, sy: -0.05, stop: 1 },
+    { at: 0.880, e: [-4.27, 3.12, 0.6], l: [-3.2, 4.2, -2.6], fov: 58, sy: -0.05 },
+    { at: 0.905, e: [-4.2, E2Y + 0.03, -2.05], l: [0.6, 4.25, -1.2], fov: 57, sy: -0.05 },
+    { at: 0.925, e: [-2.9, E2Y, -1.3], l: [2.6, 4.05, 0.25], fov: 57, sy: -0.05, stop: 1 },
+    { at: 0.948, e: [-0.4, E2Y, -0.2], l: [3.8, 3.95, 0.3], fov: 57, sy: -0.05 },
+    { at: 0.962, e: [1.75, E2Y, -1.0], l: [4.0, 3.9, 0.6], fov: 57, sy: -0.05 },
+    { at: 0.975, e: [3.4, E2Y, -1.95], l: [2.2, 3.9, 1.2], fov: 58, sy: -0.05 },
+    { at: 0.988, e: [4.2, E2Y - 0.02, -1.95], l: [-4.6, 4.4, 1.4], fov: 60, sy: -0.06, stop: 1 },
+    { at: 1.0, e: [4.2, E2Y - 0.02, -1.95], l: [-4.6, 4.4, 1.4], fov: 60, sy: -0.06, stop: 1 },
   ];
-  keys[4].easeFn = t => ease(t);
+  const AX = { t: [0.9, 12.6, 0], az: 45, el: 27, fov: 1.5, h: 39.5, sx: -0.03, ph: { h: 74, sx: -0.2, sy: -0.15 } };
+  const keys = [
+    { at: 0, ...AX },
+    { at: 0.40, ...AX },
+    { at: 0.48, t: [0.9, 4.1, 0], az: 45, el: 27, fov: 1.5, h: 17, sx: 0.2, ph: { h: 40, sx: 0, sy: -0.3 } },
+    { at: 0.52, t: [1.1, 4.0, 0], az: 42, el: 24, fov: 1.6, h: 16, sx: 0.16, ph: { h: 38, sx: 0, sy: -0.24 } },
+    ...walkKeys(WALK),
+  ];
 
   const STOPS = [
-    { id: 'porch', a: 0.53, b: 0.66, lv: 'PHASE 00 // MONTAGE ABGESCHLOSSEN', t: 'HÜLLE DICHT · TAG NEUN', m: 'Sechs Schichten  ·  ein Krantag  ·  kein Nassbau' },
-    { id: 'dining', a: 0.67, b: 0.75, lv: 'STATION 01 // OSTEINGANG · +0.33M', t: 'DER ESSTISCH', m: 'Verglaster Ostgiebel  ·  Bocktisch aus Eiche  ·  Pendelleuchten' },
-    { id: 'living', a: 0.76, b: 0.84, lv: 'STATION 02 // WOHNEN & OFEN · +0.33M', t: 'KÜCHE & WOHNRAUM', m: 'Licht vom Südfenster  ·  Leinensofa  ·  gusseiserner Holzofen' },
-    { id: 'loft', a: 0.85, b: 0.93, lv: 'STATION 03 // GALERIE · +3.20M', t: 'DIE EICHENGALERIE', m: 'Podestbett  ·  Rundfenster nach Westen  ·  Holzleiter' },
-    { id: 'ridge', a: 0.94, b: 1.01, lv: 'STATION 04 // OFFENER DACHRAUM · 96 M²', t: 'DER LANGE RAUM', m: '6.6 × 9.4 m  ·  First +6.34 m  ·  BSP, Lärche & Zink' },
+    { id: 'terrace', a: 0.53, b: 0.655, lv: 'PHASE 00 // MONTAGE ABGESCHLOSSEN', t: 'HÜLLE DICHT · TAG ELF', m: 'Sieben Schichten  ·  zwei Krantage  ·  kein Nassbau' },
+    { id: 'living', a: 0.665, b: 0.74, lv: 'STATION 01 // OSTEINGANG · +0.33M', t: 'WOHNEN AM KAMIN', m: 'Glasschiebetür 3,40 m  ·  Kaminblock in Sichtbeton  ·  Ecksofa' },
+    { id: 'kitchen', a: 0.745, b: 0.805, lv: 'STATION 02 // KÜCHE & ESSEN · +0.33M', t: 'KÜCHE & KOCHINSEL', m: 'Steinplatte  ·  Esstisch für sechs  ·  zwei Glaskugeln' },
+    { id: 'stair', a: 0.815, b: 0.89, lv: 'STATION 03 // TREPPE · 15 STEIGUNGEN', t: 'DIE HARFENTREPPE', m: 'Faltwerk aus Räuchereiche  ·  Stahlstäbe bis zur Decke' },
+    { id: 'studio', a: 0.90, b: 0.955, lv: 'STATION 04 // OBERGESCHOSS · +3.13M', t: 'DAS DACHSTUDIO', m: 'Kniestock 1,40 m  ·  Bücherwand  ·  Arbeitsplatz am Bandfenster' },
+    { id: 'ridge', a: 0.965, b: 1.01, lv: 'STATION 05 // UNTER DEM FIRST · 128 M²', t: 'DER GIEBELRAUM', m: '10,0 × 7,2 m  ·  First +7,90 m  ·  BSP, Kohlelärche & Zink' },
   ];
+
+  // the radar shows the floor the camera is on
+  const RAD = {
+    eg: `M${XW} ${-ZO} H${XE} V${ZO} H${XW} Z M${SX1} ${STOP} V${ZO} M${SX0} ${SZ} H${SX1} M${BX0} ${-ZO} H${BX1} V${BZ} H${BX0} Z M-3.1 -1.75 H-1.1 V-0.85 H-3.1 Z M-4.24 -3.44 H${BX0} V-2.84 H-4.24 Z M-2.6 1.4 H-0.4 V2.4 H-2.6 Z M1.62 1.95 H3.98 V2.9 H1.62 Z M5 -3.6 H8.2 V3.6 H5`,
+    og: `M${XW} ${-ZO} H${XE} V${ZO} H${XW} Z M${SX1} ${STOP} V${ZO} M${SX0} ${STOP} H${SX1} M2.56 -0.97 H4.66 V0.97 H2.56 Z M4.66 -1.1 H4.78 V1.1 H4.66 Z M-2.8 2.55 H-0.6 V3.36 H-2.8 Z M-3.1 -3.44 H0.9 V-3.08 H-3.1 Z M1.9 -3.44 H4.1 V-2.96 H1.9 Z`,
+  };
+  const cmPlan = document.getElementById('cm-plan'), cmZones = document.getElementById('cm-zones'), cmScale = document.getElementById('cm-scale');
+  let radFloor = '';
 
   function update(p) {
     const land = {};
     for (const id of ORDER) { const [a, b] = landAt(id); land[id] = ease(win(p, a, b)); }
-    const lv = { 1: 1 - land.floor, 2: 1 - land.structure, 3: 1 - land.rafters, 4: 1 - land.roof };
+    const lv = { 1: 1 - land.floor, 2: 1 - land.eg, 3: 1 - land.og, 4: 1 - land.rafters, 5: 1 - land.roof };
     const lift = {}; let acc = 0, prev = 0;
-    for (const k of [1, 2, 3, 4]) { acc += (LIFT[k] - prev) * lv[k]; prev = LIFT[k]; lift[k] = acc; }
+    for (const k of [1, 2, 3, 4, 5]) { acc += (LIFT[k] - prev) * lv[k]; prev = LIFT[k]; lift[k] = acc; }
+    const cur = ORDER.reduce((c, id) => p >= landAt(id)[0] - 0.006 ? id : c, null);
     for (const L of layers) {
-      L.g.position.y = lift[L.level];
+      L.g.position.y = L.level ? lift[L.level] : 0;
       const pull = PULL[L.id] ? PULL[L.id] * (1 - land[L.id]) : 0;
-      for (const s of L.subs) s.g.position.copy(s.dir).multiplyScalar(pull);
+      for (const s of L.subs) { s.g.position.copy(s.dir).multiplyScalar(pull); if (!L.level) s.g.position.y = lift[s.lv]; }
       // the layer in the air while it lands is drawn in the accent colour
-      const [a, b] = landAt(L.id);
-      const cur = ORDER.reduce((c, id) => p >= landAt(id)[0] - 0.006 ? id : c, null);
+      const [, b] = landAt(L.id);
       const on = L.id === cur && p < b + 0.012;
       for (const m of L.lines) m.color.set(on ? ACCENT : INK);
       L.label.on = on;
-      L.label.op = (p > b + 0.012 ? 0.5 : 1) * (1 - win(p, 0.40, 0.45));
+      L.label.op = (p > b + 0.012 ? 0.5 : 1) * (1 - win(p, 0.41, 0.455));
       L.label.dy = 0;
     }
-    // the sliding door opens as the camera reaches the porch
-    L3.door.g.position.z = -1.25 * ease(win(p, 0.54, 0.64));
+    // the two glass leaves slide apart as the camera reaches the terrace
+    const open = 1.66 * ease(win(p, 0.55, 0.655));
+    leafN.g.position.z = -open; leafS.g.position.z = open;
 
-    // dotted lines: plan to floor, floor to walls, walls to rafters, rafters to roof, and the sideways pulls
+    // dotted lines: plan to floor, floor to walls, storey to storey, walls to rafters, rafters to roof, and the sideways pulls
     const ls = [];
-    const y1 = lift[1], y2 = lift[2], y3 = lift[3], y4 = lift[4];
+    const [y1, y2, y3, y4, y5] = [lift[1], lift[2], lift[3], lift[4], lift[5]];
     for (const [x, z] of corners) {
-      if (y1 > 0.05) ls.push([x * 7.55 / 7.4, -0.7 + y1, z * 3.6 / 3.5, x * 7.55 / 7.4, 0, z * 3.6 / 3.5]);
+      if (y1 > 0.05) ls.push([x, -0.7 + y1, z, x, 0, z]);
       if (y2 - y1 > 0.05) ls.push([x, FL + y2, z, x, FL + y1, z]);
-      if (y3 - y2 > 0.05) ls.push([x, FL + EH + PL + y3, z, x, FL + EH + PL + y2, z]);
-      const ez = Math.sign(z) * (T * CP), ey = Y0 - T * Math.sin(40 * D2R);
-      if (y4 - y3 > 0.05) ls.push([Math.sign(x) * XR, ey + 0.22 * CP + y4, ez + Math.sign(z) * 0.22 * Math.sin(40 * D2R), Math.sign(x) * XR, ey + 0.22 * CP + y3, ez + Math.sign(z) * 0.22 * Math.sin(40 * D2R)]);
+      if (y3 - y2 > 0.05) ls.push([x, Y1 + y3, z, x, Y1 + y2, z]);
+      if (y4 - y3 > 0.05) ls.push([x, YP + PL + y4, z, x, YP + PL + y3, z]);
+      const ez = Math.sign(z) * (T * CP), ey = Y0 - T * SP, sx = Math.sign(x) * XR;
+      if (y5 - y4 > 0.05) ls.push([sx, ey + 0.22 * CP + y5, ez + Math.sign(z) * 0.22 * SP, sx, ey + 0.22 * CP + y4, ez + Math.sign(z) * 0.22 * SP]);
     }
     const gp = PULL.glazing * (1 - land.glazing), cp = PULL.cladding * (1 - land.cladding);
-    if (gp > 0.05) for (const z of [-ZI, ZI]) for (const y of [FL, UL(ZI)]) ls.push([XG + gp, y + y2, z, XE, y + y2, z]);
-    if (cp > 0.05) for (const x of [-7.45, XE]) for (const y of [c0, FL + EH + PL]) { ls.push([x, y + y2, ZO + 0.05 + cp, x, y + y2, ZO]); ls.push([x, y + y2, -ZO - 0.05 - cp, x, y + y2, -ZO]); }
+    if (gp > 0.05) {
+      for (const z of [-ZI, ZI]) for (const y of [FL, YL]) ls.push([XE + gp, y + y2, z, XE, y + y2, z]);
+      for (const z of [E2[0][0], E2[0][2]]) for (const y of [E2[0][1], E2[0][3]]) ls.push([XI + gp, y + y3, z, XE, y + y3, z]);
+    }
+    if (cp > 0.05) {
+      for (const x of [XW - 0.05, XE]) for (const [ya, yb, yl] of [[C0, CM, y2], [CM + 0.02, CT, y3]]) for (const y of [ya, yb]) {
+        ls.push([x, y + yl, ZO + 0.05 + cp, x, y + yl, ZO]); ls.push([x, y + yl, -ZO - 0.05 - cp, x, y + yl, -ZO]);
+      }
+      for (const z of [-ZO, ZO]) ls.push([XE + cp, CM + y3, z, XE, CM + y3, z]);
+    }
     dash.set(ls);
 
     const landed = ORDER.filter(id => land[id] > 0.98).length;
-    let cap = '', capOp = 0, activeStop = p < 0.52 ? 'axo' : 'porch';
+    let cap = '', capOp = 0, activeStop = p < 0.52 ? 'axo' : 'terrace';
     for (const s of STOPS) {
-      const fadeOut = s.id === 'ridge' ? 1 : (1 - win(p, s.b - 0.025, s.b));
-      const v = win(p, s.a, s.a + 0.025) * fadeOut;
-      if (v > capOp) {
-        capOp = v;
-        cap = `<span class="lv">${s.lv}</span><span class="t">${s.t}</span><span class="m">${s.m}</span>`;
-      }
+      const fadeOut = s.id === 'ridge' ? 1 : (1 - win(p, s.b - 0.02, s.b));
+      const v = win(p, s.a, s.a + 0.02) * fadeOut;
+      if (v > capOp) { capOp = v; cap = `<span class="lv">${s.lv}</span><span class="t">${s.t}</span><span class="m">${s.m}</span>`; }
       if (p >= s.a - 0.01) activeStop = s.id;
+    }
+    const floor = p > 0.8 && camAt(keys, p).pos[1] > F2 + 0.4 ? 'og' : 'eg';
+    if (floor !== radFloor && cmPlan) {
+      radFloor = floor; cmPlan.setAttribute('d', RAD[floor]);
+      if (cmScale) cmScale.textContent = floor === 'og' ? 'OG · 1:100' : 'EG · 1:100';
+      cmZones?.querySelectorAll('.cm-zone').forEach(z => { z.style.display = z.dataset.floor === floor ? '' : 'none'; });
     }
 
     return {
       hero: 1 - clamp((p - 0.43) / 0.05),
-      counter: p < 0.54 ? `Schicht <b>${String(Math.min(6, landed + (p > T0 ? 1 : 0))).padStart(2, '0')}</b> / 06` : '',
-      hint: p < 0.42 ? 'Zum Aufbauen scrollen' : p < 0.65 ? 'Zum Hineingehen scrollen' : p < 0.95 ? 'Durch das Haus scrollen' : '',
-      cap,
-      capOp,
-      stop: activeStop,
+      counter: p < 0.54 ? `Schicht <b>${String(Math.min(7, landed + (p > T0 ? 1 : 0))).padStart(2, '0')}</b> / 07` : '',
+      hint: p < 0.42 ? 'Zum Aufbauen scrollen' : p < 0.66 ? 'Zum Hineingehen scrollen' : p < 0.96 ? 'Durch das Haus scrollen' : '',
+      cap, capOp, stop: activeStop,
     };
+  }
+  // the fire is the only thing that moves on its own
+  function introHook(Tm) {
+    for (const m of flames) {
+      const { k, i } = m.userData, a = Tm * (5.2 + i * 0.7) + i * 1.9;
+      m.scale.set(1, k * (1 + 0.16 * Math.sin(a) + 0.07 * Math.sin(a * 2.3 + 1)), 1 + 0.25 * Math.sin(a * 0.8 + 2));
+      m.rotation.x = 0.07 * Math.sin(a * 0.6);
+    }
   }
 
   return {
-    update, keys, R: 70,
+    update, keys, R: 80, introHook,
     colX: () => ctx.phone ? ctx.W - 100 : ctx.W * 0.725,
-    draw: { dir: [0, 1, 0], radial: 0, min: -1, max: 23, soft: 1.4 },
+    draw: { dir: [0, 1, 0], radial: 0, min: -1, max: 29, soft: 1.5 },
     radar: {
-      scale: '1:100',
-      viewBox: '-8.6 -4.6 17.8 9.2',
-      plan: 'M-7.4 -3.5 H7.4 V3.5 H-7.4 Z M-3.7 -3.5 V3.5 M5.9 -3.5 V3.5 M-7.4 0 H-3.7 M-2.9 -3.4 H3.1 V-2.75 H-2.9 Z M1.7 -0.25 H3.9 V0.75 H1.7 Z M-2.9 1.0 H-0.6 V1.9 H-2.9 Z',
-      strokeW: 0.22, dotR: 0.65, coneW: 0.18, coneLen: 3.2,
-      clampX: [-7.4, 7.6], clampZ: [-3.4, 3.4],
-      axoDot: [6.8, 2.4], axoAng: -2.35,
+      scale: 'EG · 1:100',
+      viewBox: '-6.3 -4.4 16.2 8.8',
+      plan: RAD.eg,
+      strokeW: 0.16, dotR: 0.5, coneW: 0.14, coneLen: 2.6,
+      clampX: [-5.6, 9.2], clampZ: [-3.5, 3.5],
+      axoDot: [7.4, 2.9], axoAng: -2.35,
       zones: [
-        { stop: 'loft', p: 0.89, tag: '03 // EICHENGALERIE +3.20M', x: -7.4, y: -3.5, w: 3.7, h: 7.0 },
-        { stop: 'living', p: 0.80, tag: '02 // WOHNEN & OFEN', x: -3.7, y: -3.5, w: 5.2, h: 7.0 },
-        { stop: 'dining', p: 0.71, tag: '01 // ESSTISCH', x: 1.5, y: -3.5, w: 4.4, h: 7.0 },
-        { stop: 'porch', p: 0.62, tag: 'VERANDA // +0.33M', x: 5.9, y: -3.5, w: 1.9, h: 7.0 },
+        { stop: 'stair', p: 0.848, tag: '03 // HARFENTREPPE', x: XW, y: -1.4, w: 1.3, h: 5.0, floor: 'eg' },
+        { stop: 'kitchen', p: 0.77, tag: '02 // KÜCHE & ESSEN', x: -3.7, y: -ZO, w: 3.9, h: 7.2, floor: 'eg' },
+        { stop: 'living', p: 0.695, tag: '01 // WOHNEN AM KAMIN', x: 0.2, y: -ZO, w: 4.8, h: 7.2, floor: 'eg' },
+        { stop: 'terrace', p: 0.62, tag: 'TERRASSE // +0.30M', x: 5.0, y: -ZO, w: 3.2, h: 7.2, floor: 'eg' },
+        { stop: 'studio', p: 0.925, tag: '04 // DACHSTUDIO +3.13M', x: XW, y: -ZO, w: 6.5, h: 7.2, floor: 'og' },
+        { stop: 'ridge', p: 0.99, tag: '05 // GIEBELRAUM', x: 1.5, y: -ZO, w: 3.5, h: 7.2, floor: 'og' },
       ],
       stops: [
-        { stop: 'axo', p: 0.18, tag: 'AXO-STAPEL // 01-06', label: 'AXO' },
-        { stop: 'porch', p: 0.62, tag: 'VERANDA // +0.33M', label: 'VERANDA' },
-        { stop: 'dining', p: 0.71, tag: '01 // ESSTISCH', label: 'ESSEN' },
-        { stop: 'living', p: 0.80, tag: '02 // WOHNEN & OFEN', label: 'WOHNEN' },
-        { stop: 'loft', p: 0.89, tag: '03 // EICHENGALERIE +3.20M', label: 'GALERIE' },
-        { stop: 'ridge', p: 0.98, tag: '04 // DER LANGE RAUM', label: 'FIRST' },
+        { stop: 'axo', p: 0.18, tag: 'AXO-STAPEL // 01-07', label: 'AXO' },
+        { stop: 'terrace', p: 0.62, tag: 'TERRASSE // +0.30M', label: 'TERR' },
+        { stop: 'living', p: 0.695, tag: '01 // WOHNEN AM KAMIN', label: 'WOHNEN' },
+        { stop: 'kitchen', p: 0.77, tag: '02 // KÜCHE & ESSEN', label: 'KÜCHE' },
+        { stop: 'stair', p: 0.848, tag: '03 // HARFENTREPPE', label: 'TREPPE' },
+        { stop: 'studio', p: 0.925, tag: '04 // DACHSTUDIO +3.13M', label: 'STUDIO' },
+        { stop: 'ridge', p: 0.99, tag: '05 // GIEBELRAUM', label: 'FIRST' },
       ],
     },
     chrome: {
@@ -460,73 +700,115 @@ export async function build(labels) {
       nav: 'Häuser     Werkstatt     Journal', cta: 'Haus anfragen',
       kicker: 'Axonometrie · Blatt A-04 · 1:100',
       loader: 'Plotte Blatt A-04',
-      h1: 'So fügt sich<br>ein Haus <em>zusammen.</em>',
-      lede: 'Sechs Schichten, in unserer Werkstatt vorgefertigt und in neun Tagen auf der Baustelle geschlossen. Scrollen Sie, um das Haus zusammenzusetzen, und gehen Sie dann durch den Langen Raum hinein und hinauf auf die Eichengalerie.',
-      spec: [['Haus', 'Der Lange Raum'], ['Fläche', '96 m² + Galerie'], ['Tragwerk', 'BSP, Lärche, Zink']],
+      h1: 'Zwei Geschosse.<br>Sieben <em>Schichten.</em>',
+      lede: 'Sieben Schichten, in unserer Werkstatt vorgefertigt und in elf Tagen auf der Baustelle geschlossen. Scrollen Sie, um das Haus zusammenzusetzen, und gehen Sie dann durch die große Glastür hinein und die Treppe hinauf bis unter den First.',
+      spec: [['Haus', 'Haus Karbon'], ['Fläche', '128 m² · zwei Ebenen'], ['Hülle', 'BSP, Kohlelärche, Zink']],
       hint: 'Zum Aufbauen scrollen',
     },
   };
 }
 
-// ---- the ground floor plan, drawn once into a canvas
+// ---- the walk. The stations are joined by a smooth curve instead of straight legs, so the camera rounds
+// its corners; between two stops the pace eases in and out, and it flows through the points in between.
+function walkKeys(st) {
+  const n = st.length - 1;
+  const eyes = new THREE.CatmullRomCurve3(st.map(s => V(...s.e)), false, 'centripetal');
+  const looks = new THREE.CatmullRomCurve3(st.map(s => V(...s.l)), false, 'centripetal');
+  const eyesP = new THREE.CatmullRomCurve3(st.map(s => V(...(s.pe || s.e))), false, 'centripetal');      // a phone stands further back outside
+  const pf = s => s.pf ?? Math.min(s.fov + 15, 76), ps = s => s.ps ?? s.sy * 0.7;
+  const stops = st.map((s, i) => s.stop ? i : -1).filter(i => i >= 0);
+  const out = [], SUB = 10;
+  for (let i = 0; i < n; i++) {
+    const a = st[i], b = st[i + 1];
+    const i0 = stops.filter(k => k <= i).pop(), i1 = stops.find(k => k > i);
+    for (let k = i === 0 ? 0 : 1; k <= SUB; k++) {
+      const t = k / SUB, at = lerp(a.at, b.at, t);
+      const u = Math.min(1, (i0 + (i1 - i0) * ease2((i + t - i0) / (i1 - i0))) / n);     // position along the curve, 0..1
+      const j = Math.min(n - 1, Math.floor(u * n)), f = u * n - j;
+      const fov = Math.exp(lerp(Math.log(st[j].fov), Math.log(st[j + 1].fov), f)), sy = lerp(st[j].sy, st[j + 1].sy, f);
+      const e = eyes.getPoint(u).toArray(), l = looks.getPoint(u).toArray();
+      const fovP = Math.exp(lerp(Math.log(pf(st[j])), Math.log(pf(st[j + 1])), f)), syP = lerp(ps(st[j]), ps(st[j + 1]), f);
+      out.push(eyeKey(at, e, l, fov, { sy, easeFn: x => x, ph: eyeKey(at, eyesP.getPoint(u).toArray(), l, fovP, { sy: syP }) }));
+    }
+  }
+  delete out[0].easeFn;       // the dolly-zoom into the first station keeps its ease
+  return out;
+}
+
+// ---- the ground floor plan, drawn once into a canvas: white ink on the black sheet
 function drawPlan() {
   const S = 100, X = x => (x + 12) * S, Y = z => (z + 8) * S;
   return canvasTex(2400, 1600, (g) => {
-    g.fillStyle = '#f2efe7'; g.fillRect(0, 0, 2400, 1600);
+    g.fillStyle = PAPER; g.fillRect(0, 0, 2400, 1600);
     g.strokeStyle = INK; g.lineWidth = 2.2; g.strokeRect(36, 36, 2328, 1528);
     g.lineWidth = 1; g.strokeRect(46, 46, 2308, 1508);
     const line = (x0, z0, x1, z1, w = 2, dash = []) => { g.setLineDash(dash); g.lineWidth = w; g.beginPath(); g.moveTo(X(x0), Y(z0)); g.lineTo(X(x1), Y(z1)); g.stroke(); g.setLineDash([]); };
     const box = (x0, z0, x1, z1, w = 2, fill) => { if (fill) { g.fillStyle = fill; g.fillRect(X(x0), Y(z0), X(x1) - X(x0), Y(z1) - Y(z0)); } g.lineWidth = w; g.strokeRect(X(x0), Y(z0), X(x1) - X(x0), Y(z1) - Y(z0)); };
+    const circ = (x, z, r, w = 1.5) => { g.lineWidth = w; g.beginPath(); g.arc(X(x), Y(z), r * S, 0, 7); g.stroke(); };
+    const tri = (x0, z0, x1, z1, x2, z2) => { g.beginPath(); g.moveTo(X(x0), Y(z0)); g.lineTo(X(x1), Y(z1)); g.lineTo(X(x2), Y(z2)); g.closePath(); g.fill(); };
     g.strokeStyle = INK; g.fillStyle = INK;
     // grid with bubbles
     g.font = '500 26px "IBM Plex Mono"'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    [[-7.4, 'A'], [-3.7, 'B'], [XG, 'C'], [7.4, 'D']].forEach(([x, n]) => { line(x, -6.6, x, 6.0, 1.2, [24, 8, 4, 8]); g.beginPath(); g.arc(X(x), Y(-6.95), 24, 0, 7); g.stroke(); g.fillText(n, X(x), Y(-6.95)); });
-    [[-3.5, '1'], [0, '2'], [3.5, '3']].forEach(([z, n]) => { line(-10.2, z, 9.6, z, 1.2, [24, 8, 4, 8]); g.beginPath(); g.arc(X(-10.55), Y(z), 24, 0, 7); g.stroke(); g.fillText(n, X(-10.55), Y(z)); });
+    [[XW, 'A'], [BX0, 'B'], [XE, 'C'], [8.2, 'D']].forEach(([x, n]) => { line(x, -6.6, x, 6.0, 1.2, [24, 8, 4, 8]); g.beginPath(); g.arc(X(x), Y(-6.95), 24, 0, 7); g.stroke(); g.fillText(n, X(x), Y(-6.95)); });
+    [[-ZO, '1'], [0, '2'], [ZO, '3']].forEach(([z, n]) => { line(-10.2, z, 10.2, z, 1.2, [24, 8, 4, 8]); g.beginPath(); g.arc(X(-10.55), Y(z), 24, 0, 7); g.stroke(); g.fillText(n, X(-10.55), Y(z)); });
     // roof line
-    line(-XR, -4.05, XR, -4.05, 1.5, [14, 10]); line(-XR, 4.05, XR, 4.05, 1.5, [14, 10]); line(-XR, -4.05, -XR, 4.05, 1.5, [14, 10]); line(XR, -4.05, XR, 4.05, 1.5, [14, 10]);
-    // walls in poché, openings left white
+    const ze = ZO + OH; line(-XR, -ze, XR, -ze, 1.5, [14, 10]); line(-XR, ze, XR, ze, 1.5, [14, 10]); line(-XR, -ze, -XR, ze, 1.5, [14, 10]); line(XR, -ze, XR, ze, 1.5, [14, 10]);
+    // walls in poché, openings left open
     g.fillStyle = INK;
-    const wallX = (z0, z1, holes) => { let a = -7.45; const cuts = [...holes.map(h => [h[0], h[2]]), [6.2, XE]].sort((p, q) => p[0] - q[0]); for (const [u0, u1] of cuts) { g.fillRect(X(a), Y(z0), X(u0) - X(a), Y(z1) - Y(z0)); a = u1; } };
-    wallX(ZI, ZO + 0.05, SOUTH); wallX(-ZO - 0.05, -ZI, NORTH);
-    let a = -ZO - 0.05; for (const [u0, , u1] of [...WEST].sort((p, q) => p[0] - q[0])) { g.fillRect(X(-7.45), Y(a), X(-7.28) - X(-7.45), Y(u0) - Y(a)); a = u1; } g.fillRect(X(-7.45), Y(a), X(-7.28) - X(-7.45), Y(ZO + 0.05) - Y(a));
-    // glazing as thin double lines
-    for (const [u0, , u1] of SOUTH) { line(u0, ZO - 0.03, u1, ZO - 0.03, 1.5); line(u0, ZI + 0.03, u1, ZI + 0.03, 1.5); }
-    for (const [u0, , u1] of NORTH) { line(u0, -ZO + 0.03, u1, -ZO + 0.03, 1.5); line(u0, -ZI - 0.03, u1, -ZI - 0.03, 1.5); }
-    line(XG - 0.04, -ZI, XG - 0.04, ZI, 1.5); line(XG + 0.04, -ZI, XG + 0.04, ZI, 1.5); line(XG + 0.1, -0.62, XG + 0.1, 0.62, 3);
-    // the box, its doors and fittings
-    box(-3.82, -ZI, -3.7, ZI, 1, INK); g.fillStyle = '#f2efe7'; g.fillRect(X(-3.83), Y(-1.6), 14, Y(-0.7) - Y(-1.6)); g.fillRect(X(-3.83), Y(0.7), 14, Y(1.5) - Y(0.7)); g.fillStyle = INK;
-    box(-7.28, -0.05, -3.82, 0.05, 1, INK);
-    g.lineWidth = 1.2; g.beginPath(); g.arc(X(-3.7), Y(-0.7), 0.9 * S, Math.PI, 1.5 * Math.PI); g.stroke(); line(-3.7, -0.7, -4.6, -0.7, 1.5);
-    g.beginPath(); g.arc(X(-3.7), Y(1.5), 0.8 * S, 0.5 * Math.PI, Math.PI); g.stroke(); line(-3.7, 1.5, -4.5, 1.5, 1.5);
-    box(-7.1, -3.2, -5.2, -1.2, 1.5); box(-7.1, -3.2, -6.6, -2.2, 1); box(-7.1, -2.15, -6.6, -1.25, 1);
-    box(-7.1, 0.4, -6.4, 2.2, 1.5); box(-5.6, 2.6, -4.9, 3.2, 1.5); g.beginPath(); g.ellipse(X(-4.4), Y(0.55), 26, 20, 0, 0, 7); g.stroke();
-    // kitchen, table, sofa, rug
-    box(-2.9, -ZI, -1.7, -2.76, 1.5); box(-1.7, -ZI, 3.1, -2.76, 1.5); g.beginPath(); g.ellipse(X(0.6), Y(-3.07), 24, 16, 0, 0, 7); g.stroke();
-    box(1.8, -0.2, 3.9, 0.75, 1.5); box(1.9, 0.95, 3.8, 1.28, 1); for (const x of [2.2, 2.85, 3.5]) box(x - 0.21, -0.8, x + 0.21, -0.36, 1);
-    box(-2.9, 1.0, -0.6, 1.9, 1.5); box(-2.9, 1.0, -0.6, 1.22, 1); line(-3.2, 0.75, -0.3, 0.75, 1, [8, 6]); line(-3.2, 3.0, -0.3, 3.0, 1, [8, 6]);
-    g.beginPath(); g.arc(X(-1.75), Y(2.4), 40, 0, 7); g.stroke();
-    // porch boards and steps
-    for (let z = -ZI + 0.14; z < ZI; z += 0.14) line(XG + 0.06, z, XE, z, 0.8);
-    // room names & elevation datums
-    g.fillStyle = INK; g.font = '700 32px "Chakra Petch"';
-    g.fillText('WOHNEN', X(-1.6), Y(-0.5)); g.fillText('KÜCHE', X(1.3), Y(-1.9)); g.fillText('VERANDA', X(6.65), Y(-1.6));
-    g.font = '600 26px "Chakra Petch"'; g.fillText('SCHLAFEN', X(-5.6), Y(-1.9)); g.fillText('BAD', X(-5.8), Y(1.6));
-    g.font = '400 20px "IBM Plex Mono"'; g.fillText('62 M² · OKFF +0.33', X(-1.6), Y(-0.15));
-    g.fillText('TERRASSE +0.30', X(6.65), Y(-1.25));
-    // dimensions along the south side
+    const wallX = (z0, z1, holes) => { let a = XW; for (const [u0, u1] of holes.map(h => [h[0], h[2]]).sort((p, q) => p[0] - q[0])) { g.fillRect(X(a), Y(z0), X(u0) - X(a), Y(z1) - Y(z0)); a = u1; } g.fillRect(X(a), Y(z0), X(XE) - X(a), Y(z1) - Y(z0)); };
+    wallX(ZI, ZO, S1); wallX(-ZO, -ZI, N1);
+    { let a = -ZO; for (const [u0, , u1] of W1) { g.fillRect(X(XW), Y(a), X(XW + TH) - X(XW), Y(u0) - Y(a)); a = u1; } g.fillRect(X(XW), Y(a), X(XW + TH) - X(XW), Y(ZO) - Y(a)); }
+    g.fillRect(X(XI), Y(DW), X(XE) - X(XI), 0.12 * S); g.fillRect(X(XI), Y(-DW - 0.12), X(XE) - X(XI), 0.12 * S);
+    // glazing as thin double lines, the two leaves on their rail with the way they slide
+    const glz = (a0, a1, w0, w1, alongX) => { for (const w of [w0 + 0.04, w1 - 0.04]) alongX ? line(a0, w, a1, w, 1.5) : line(w, a0, w, a1, 1.5); };
+    for (const [u0, , u1] of S1) glz(u0, u1, ZI, ZO, true);
+    for (const [u0, , u1] of N1) glz(u0, u1, -ZO, -ZI, true);
+    for (const [u0, , u1] of W1) glz(u0, u1, XW, XW + TH, false);
+    glz(DW + 0.12, ZI, XI, XE, false); glz(-ZI, -DW - 0.12, XI, XE, false);
+    line(XE + 0.06, -DW, XE + 0.06, -0.02, 3.5); line(XE + 0.06, 0.02, XE + 0.06, DW, 3.5); line(XE + 0.06, -ZI, XE + 0.06, ZI, 0.8, [10, 8]);
+    for (const s of [-1, 1]) { line(XE + 0.32, s * 0.2, XE + 0.32, s * 1.3, 1.2); tri(XE + 0.32, s * 1.48, XE + 0.24, s * 1.26, XE + 0.4, s * 1.26); }
+    // chimney block (hatched), bench, kitchen
+    g.save(); g.beginPath(); g.rect(X(BX0), Y(-ZI), (BX1 - BX0) * S, (BZ + ZI) * S); g.clip();
+    for (let k = -4; k < 22; k++) line(BX0 - 0.1, -ZI + k * 0.16 + 0.7, BX1 + 0.1, -ZI + k * 0.16 - 0.1, 0.8);
+    g.restore(); box(BX0, -ZI, BX1, BZ, 1.8); box(0.56, -2.56, 0.74, -1.64, 1, PAPER);
+    box(BX1, -ZI, 1.3, BZ, 1.2);
+    box(XW + TH, -ZI, -4.24, -1.44, 1.5); line(XW + TH, -ZI, -4.24, -1.44, 0.8); line(-4.24, -ZI, XW + TH, -1.44, 0.8);
+    box(-4.24, -ZI, BX0, -2.84, 1.5); box(-2.6, -3.3, -1.95, -2.94, 1); circ(-2.28, -3.12, 0.1, 1);
+    box(-3.16, -1.8, -1.04, -0.52, 1.5); box(-2.55, -1.6, -1.7, -1.08, 1); for (const [x, z] of [[-2.34, -1.47], [-1.92, -1.47], [-2.34, -1.21], [-1.92, -1.21]]) circ(x, z, 0.08, 1);
+    for (const x of [-2.7, -2.1, -1.5]) circ(x, -0.44, 0.165, 1.2);
+    // stair with its walking line, cut after the eighth riser
+    box(SX0, STOP, SX1, SZ, 1.5);
+    for (let i = 1; i < 9; i++) line(SX0, SZ - i * GO, SX1, SZ - i * GO, 1);
+    for (let i = 9; i < NR - 1; i++) line(SX0, SZ - i * GO, SX1, SZ - i * GO, 0.8, [6, 6]);
+    line(SX0 - 0.1, SZ - 8.2 * GO, SX1 + 0.1, SZ - 8.9 * GO, 1.5);
+    const sm = (SX0 + SX1) / 2; line(sm, SZ + 0.25, sm, SZ - 7.4 * GO, 1.2); circ(sm, SZ + 0.25, 0.05, 1.2);
+    tri(sm, SZ - 7.9 * GO, sm - 0.09, SZ - 7.2 * GO, sm + 0.09, SZ - 7.2 * GO);
+    // table and chairs, sofa, tables, chair, sideboard, rug
+    box(-2.6, 1.4, -0.4, 2.4, 1.5); for (const x of [-2.15, -1.5, -0.85]) { box(x - 0.21, 0.96, x + 0.21, 1.36, 1); box(x - 0.21, 2.44, x + 0.21, 2.84, 1); }
+    box(1.42, 1.95, 4.18, 2.92, 1.5); box(3.23, 1.0, 4.18, 1.95, 1.5); line(1.62, 2.66, 3.98, 2.66, 1); line(1.25, 0.2, 4.45, 0.2, 1, [8, 6]); line(1.25, 0.2, 1.25, 1.5, 1, [8, 6]); line(4.45, 0.2, 4.45, 1.0, 1, [8, 6]);
+    circ(2.45, 1.05, 0.44); circ(3.2, 0.5, 0.29); box(0.6, 1.56, 1.32, 2.25, 1.5); line(0.82, 1.6, 0.82, 2.2, 1); box(1.7, -ZI, 3.0, -2.98, 1.5); circ(4.32, -2.92, 0.21); circ(1.16, 2.72, 0.17, 1);
+    // terrace boards, step, trough, lounger
+    for (let z = -ZO + 0.14; z < ZO; z += 0.14) line(XE + 0.12, z, 8.2, z, 0.7);
+    box(XE, -ZO, 8.2, ZO, 1.5); box(8.24, -1.9, 8.66, 1.9, 1.2); box(5.5, -3.42, 7.7, -2.8, 1.5, PAPER); box(5.95, 2.05, 7.75, 2.75, 1.2, PAPER);
+    // room names and levels
+    const label = (t, x, z, f) => { g.font = f; const w = g.measureText(t).width + 16; g.fillStyle = PAPER; g.fillRect(X(x) - w / 2, Y(z) - 17, w, 34); g.fillStyle = INK; g.fillText(t, X(x), Y(z)); };
+    label('WOHNEN', 2.6, -0.85, '700 32px "Chakra Petch"'); label('KÜCHE', -2.1, -2.3, '700 32px "Chakra Petch"'); label('TERRASSE', 6.6, -0.4, '700 32px "Chakra Petch"');
+    label('ESSEN', -1.5, 0.5, '600 26px "Chakra Petch"');
+    label('66 M² · OKFF +0.33', 2.6, -0.5, '400 20px "IBM Plex Mono"'); label('DECK +0.30', 6.6, -0.05, '400 20px "IBM Plex Mono"');
+    label('15 STG 18.7/27', -4.34, 3.02, '500 15px "IBM Plex Mono"');
+    // dimensions along the south side and the east
     const dim = (x0, x1, z, t) => { line(x0, z, x1, z, 1.2); for (const x of [x0, x1]) line(x - 0.12, z + 0.12, x + 0.12, z - 0.12, 2); g.font = '400 22px "IBM Plex Mono"'; g.fillText(t, X((x0 + x1) / 2), Y(z) - 18); };
-    dim(-7.45, XE, 5.0, '14 850'); dim(-7.45, -3.7, 5.7, '3 750'); dim(-3.7, XG, 5.7, '9 600'); dim(XG, XE, 5.7, '1 500');
-    g.save(); g.translate(X(9.1), Y(0)); g.rotate(-Math.PI / 2); g.font = '400 22px "IBM Plex Mono"'; g.fillText('7 100', 0, -18); g.restore();
-    line(9.1, -3.55, 9.1, 3.55, 1.2);
-    // north arrow, scale bar, and title block
-    g.beginPath(); g.arc(X(10.3), Y(-6.4), 34, 0, 7); g.stroke(); g.beginPath(); g.moveTo(X(10.3), Y(-6.4) - 44); g.lineTo(X(10.3) - 12, Y(-6.4) + 10); g.lineTo(X(10.3) + 12, Y(-6.4) + 10); g.closePath(); g.fill();
-    g.textAlign = 'left'; g.font = '700 30px "Chakra Petch"'; g.fillText('ERDGESCHOSS', X(-10.9), Y(6.95)); g.font = '400 20px "IBM Plex Mono"'; g.fillText('DER LANGE RAUM · 1:100 · PLAN A-01', X(-10.9), Y(7.3));
+    dim(XW, XE, 5.0, '10 000'); dim(XW, BX0, 5.7, '5 200'); dim(BX0, XE, 5.7, '4 800'); dim(XE, 8.2, 5.7, '3 200');
+    g.save(); g.translate(X(9.6), Y(0)); g.rotate(-Math.PI / 2); g.font = '400 22px "IBM Plex Mono"'; g.fillText('7 200', 0, -18); g.restore();
+    line(9.6, -ZO, 9.6, ZO, 1.2); for (const z of [-ZO, ZO]) line(9.48, z + 0.12, 9.72, z - 0.12, 2);
+    // north arrow, scale bar, title block
+    g.lineWidth = 1.5; g.beginPath(); g.arc(X(10.6), Y(-6.4), 34, 0, 7); g.stroke(); g.beginPath(); g.moveTo(X(10.6), Y(-6.4) - 44); g.lineTo(X(10.6) - 12, Y(-6.4) + 10); g.lineTo(X(10.6) + 12, Y(-6.4) + 10); g.closePath(); g.fill();
+    g.textAlign = 'left'; g.font = '700 30px "Chakra Petch"'; g.fillText('ERDGESCHOSS', X(-10.9), Y(6.95)); g.font = '400 20px "IBM Plex Mono"'; g.fillText('HAUS KARBON · 1:100 · PLAN A-01', X(-10.9), Y(7.3));
     for (let i = 0; i < 5; i++) {
-      g.fillStyle = i % 2 === 0 ? INK : '#f2efe7';
-      g.fillRect(X(6.5 + i * 0.8), Y(7.02), 0.8 * S, 10);
+      g.fillStyle = i % 2 === 0 ? INK : PAPER;
+      g.fillRect(X(6.5 + i * 0.8), Y(7.02), 0.8 * S, 10); g.lineWidth = 1.2;
       g.strokeRect(X(6.5 + i * 0.8), Y(7.02), 0.8 * S, 10);
     }
     g.fillStyle = INK; g.font = '500 18px "IBM Plex Mono"'; g.fillText('0', X(6.5), Y(7.32)); g.fillText('5 M', X(10.2), Y(7.32));
   });
 }
-

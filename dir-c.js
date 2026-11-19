@@ -13,41 +13,41 @@ const CORE = [6.4, -7.4, 11.4, -3.2];          // x0, z0, x1, z1: the north-east
 
 export async function build(labels) {
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  scene.add(new THREE.HemisphereLight('#fbf8f2', '#e6ddcd', 2.1), new THREE.AmbientLight('#fff8ee', 0.5));
-  const sun = new THREE.DirectionalLight('#fff3e2', 1.8);
+  scene.add(new THREE.HemisphereLight('#ffffff', '#8f8f98', 2.0), new THREE.AmbientLight('#ffffff', 0.4));
+  const sun = new THREE.DirectionalLight('#ffffff', 1.9);
   sun.position.set(-30, 52, 40); sun.castShadow = true; sun.shadow.mapSize.set(4096, 4096);
   Object.assign(sun.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 5, far: 160 });
   sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.04; sun.target.position.set(0, 10, 0);
   scene.add(sun, sun.target);
-  scene.fog = new THREE.Fog('#f2efe7', 140, 420);
+  scene.fog = new THREE.Fog('#0c0c0e', 140, 420);
 
   const T = textures();
   const PAL = {
-    card: { mat: stdMat('#f3f0ea', { rough: 0.95, bumpMap: T.concBump, bumpScale: 0.006 }), uvScale: 0.2 },
-    street: { mat: stdMat('#e3ded4', { rough: 0.95, bumpMap: T.concBump, bumpScale: 0.008 }), uvScale: 0.15 },
-    clt: { mat: stdMat('#ffffff', { rough: 0.62, map: T.clt, bumpMap: T.cltBump, bumpScale: 0.022, env: 0.5 }) },
-    screed: { mat: stdMat('#ffffff', { rough: 0.68, map: T.screed, bumpMap: T.concBump, bumpScale: 0.012, env: 0.45 }), uvScale: 0.45, w: 'mid' },
-    glulam: { mat: stdMat('#ffffff', { rough: 0.54, map: T.lamH, bumpMap: T.lamHBump, bumpScale: 0.02, env: 0.55 }) },
-    col: { mat: stdMat('#ffffff', { rough: 0.54, map: T.lamV, bumpMap: T.lamVBump, bumpScale: 0.02, env: 0.55 }) },
-    beam2: { mat: stdMat('#ffffff', { rough: 0.54, map: T.lamH, bumpMap: T.lamHBump, bumpScale: 0.02, env: 0.55 }), w: 'mid' },
-    larch: { mat: stdMat('#ffffff', { rough: 0.64, map: T.larch, bumpMap: T.lamVBump, bumpScale: 0.016 }), uvScale: 0.8 },
-    fin: { mat: stdMat('#ffffff', { rough: 0.64, map: T.larch, bumpMap: T.lamVBump, bumpScale: 0.016 }), uvScale: 0.8, w: 'thin' },
-    concrete: { mat: stdMat('#ffffff', { rough: 0.84, map: T.stipple, bumpMap: T.concBump, bumpScale: 0.025 }) },
-    pier: { mat: stdMat('#ffffff', { rough: 0.84, map: T.stipple, bumpMap: T.concBump, bumpScale: 0.025 }) },
-    core: { mat: stdMat('#d6d1c8', { rough: 0.88, map: T.hatch, bumpMap: T.concBump, bumpScale: 0.02 }) },
-    coreWall: { mat: stdMat('#b9b4aa', { rough: 0.88, bumpMap: T.concBump, bumpScale: 0.014 }) },
-    glass: { mat: stdMat('#b7cdd3', { opacity: 0.14, rough: 0.06, env: 0.85 }), cast: false, edges: false },
-    frame: { mat: stdMat('#3c3b36', { rough: 0.42, metal: 0.45, env: 0.65 }) },
-    desk: { mat: stdMat('#f4f1ea', { rough: 0.52, bumpMap: T.cltBump, bumpScale: 0.008 }), uvScale: 0.8 },
-    chair: { mat: stdMat('#9a978f', { rough: 0.6 }) , w: 'mid' },
-    green: { mat: stdMat('#7d9466', { rough: 0.92, bumpMap: T.concBump, bumpScale: 0.02 }), uvScale: 0.6 },
-    tree: { mat: stdMat('#f3f0e8', { rough: 1 }), hull: 1, edges: false },
-    leaf: { mat: stdMat('#6f8a57', { rough: 0.88 }), hull: 1, edges: false },
+    card: { mat: stdMat('#101012', { rough: 0.95, bumpMap: T.concBump, bumpScale: 0.006 }), uvScale: 0.2 },
+    street: { mat: stdMat('#18181b', { rough: 0.95, bumpMap: T.concBump, bumpScale: 0.008 }), uvScale: 0.15 },
+    clt: { mat: stdMat('#84848a', { rough: 0.62, map: T.clt, bumpMap: T.cltBump, bumpScale: 0.022, env: 0.5 }) },
+    screed: { mat: stdMat('#55555b', { rough: 0.68, map: T.screed, bumpMap: T.concBump, bumpScale: 0.012, env: 0.45 }), uvScale: 0.45, w: 'mid' },
+    glulam: { mat: stdMat('#8c8c92', { rough: 0.54, map: T.lamH, bumpMap: T.lamHBump, bumpScale: 0.02, env: 0.55 }) },
+    col: { mat: stdMat('#8c8c92', { rough: 0.54, map: T.lamV, bumpMap: T.lamVBump, bumpScale: 0.02, env: 0.55 }) },
+    beam2: { mat: stdMat('#8c8c92', { rough: 0.54, map: T.lamH, bumpMap: T.lamHBump, bumpScale: 0.02, env: 0.55 }), w: 'mid' },
+    larch: { mat: stdMat('#4e4e54', { rough: 0.64, map: T.larch, bumpMap: T.lamVBump, bumpScale: 0.016 }), uvScale: 0.8 },
+    fin: { mat: stdMat('#4e4e54', { rough: 0.64, map: T.larch, bumpMap: T.lamVBump, bumpScale: 0.016 }), uvScale: 0.8, w: 'thin' },
+    concrete: { mat: stdMat('#6e6e74', { rough: 0.84, map: T.stipple, bumpMap: T.concBump, bumpScale: 0.025 }) },
+    pier: { mat: stdMat('#6e6e74', { rough: 0.84, map: T.stipple, bumpMap: T.concBump, bumpScale: 0.025 }) },
+    core: { mat: stdMat('#45454b', { rough: 0.88, map: T.hatch, bumpMap: T.concBump, bumpScale: 0.02 }) },
+    coreWall: { mat: stdMat('#2e2e33', { rough: 0.88, bumpMap: T.concBump, bumpScale: 0.014 }) },
+    glass: { mat: stdMat('#dfe6ea', { opacity: 0.14, rough: 0.06, env: 0.85 }), cast: false, edges: false },
+    frame: { mat: stdMat('#101012', { rough: 0.42, metal: 0.45, env: 0.65 }) },
+    desk: { mat: stdMat('#e4e1dc', { rough: 0.52, bumpMap: T.cltBump, bumpScale: 0.008 }), uvScale: 0.8 },
+    chair: { mat: stdMat('#46464c', { rough: 0.6 }) , w: 'mid' },
+    green: { mat: stdMat('#2a2e2b', { rough: 0.92, bumpMap: T.concBump, bumpScale: 0.02 }), uvScale: 0.6 },
+    tree: { mat: stdMat('#dedbd6', { rough: 1 }), hull: 1, edges: false },
+    leaf: { mat: stdMat('#3b403c', { rough: 0.88 }), hull: 1, edges: false },
     figure: { mat: stdMat('#f7f4ee', { side: THREE.DoubleSide }), thr: 20 },
   };
-  const line = lineMat({ w: 0.8, color: '#2a2622', opacity: 0.8 });
-  const ctxLine = lineMat({ w: 0.7, color: '#6a655b', opacity: 0.32 });
-  const joint = lineMat({ w: 0.5, color: '#7a6a52', opacity: 0.55 });
+  const line = lineMat({ w: 0.8, color: INK, opacity: 0.8 });
+  const ctxLine = lineMat({ w: 0.7, color: '#8b8883', opacity: 0.34 });
+  const joint = lineMat({ w: 0.5, color: '#8b8883', opacity: 0.4 });
 
   // ---- the city block, as a white card model
   const city = new THREE.Group(); scene.add(city);
@@ -73,7 +73,7 @@ export async function build(labels) {
   const storeys = [];
   function storey(no, name, sub, base) {
     const g = new THREE.Group(); scene.add(g);
-    const ln = lineMat({ w: 1.0, color: '#2a2622', opacity: 0.9 }), mid = lineMat({ w: 0.6, color: '#2a2622', opacity: 0.7 }), thin = lineMat({ w: 0.45, color: '#2a2622', opacity: 0.45 });
+    const ln = lineMat({ w: 1.0, color: INK, opacity: 0.9 }), mid = lineMat({ w: 0.6, color: INK, opacity: 0.7 }), thin = lineMat({ w: 0.45, color: INK, opacity: 0.45 });
     const s = { no, name, sub, base, g, line: ln, lines: [ln, mid, thin], part: new Part(g, PAL, ln, { mid, thin }) };
     storeys.push(s); return s;
   }
@@ -189,7 +189,7 @@ export async function build(labels) {
   // the core: one concrete tower that always stands 2.6 m clear of the roof, so it stretches with the stack.
   const CORE_TOP0 = G0 + 4 * FH + BEAM + SLAB + 2.6;
   const coreG = new THREE.Group(); coreG.position.y = 0.3; scene.add(coreG);
-  const coreLine = lineMat({ w: 1.1, color: '#2a2622', opacity: 0.9 });
+  const coreLine = lineMat({ w: 1.1, color: INK, opacity: 0.9 });
   const cpart = new Part(coreG, PAL, coreLine);
   coreWalls(cpart, 0, CORE_TOP0 - 0.3, 'coreWall');
   cpart.build();
@@ -229,7 +229,7 @@ export async function build(labels) {
       s.g.position.y = s.base + acc;
       const cur = LAND.reduce((c, [a], j) => p >= a - 0.004 ? j : c, -1);
       const on = i === cur && p < LAND[i][1] + 0.012;
-      for (const m of s.lines) m.color.set(on ? ACCENT : '#2a2622');
+      for (const m of s.lines) m.color.set(on ? ACCENT : INK);
       s.label.on = on; s.label.op = p < 0.36 ? 1 : clamp(1 - (p - 0.36) / 0.04);
       coreLabel.op = p < 0.36 ? 1 : clamp(1 - (p - 0.36) / 0.04);
     });

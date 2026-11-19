@@ -16,9 +16,11 @@ export const easeOut = t => 1 - Math.pow(1 - t, 3);
 export const win = (p, a, b) => clamp((p - a) / (b - a));
 export const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
-export const INK = '#1d1c19';
-export const PAPER = '#f2efe7';
-export const ACCENT = '#e85d04';
+// The sheet is black, the ink is white and the pen is red.
+export const INK = '#f1eeea';
+export const PAPER = '#0c0c0e';
+export const ACCENT = '#e5202e';
+export const ACCENT_HI = '#ff4d57';
 
 export const ctx = { W: innerWidth, H: innerHeight, res: new THREE.Vector2(innerWidth, innerHeight), lineMats: new Set(), shadows: false, phone: innerWidth < 700 };
 
@@ -27,7 +29,7 @@ export const ctx = { W: innerWidth, H: innerHeight, res: new THREE.Vector2(inner
 export const DRAW = {
   uDraw: { value: 1e5 }, uDrawFill: { value: 1e5 }, uDrawSoft: { value: 1.2 },
   uDrawDir: { value: new THREE.Vector4(0, 1, 0, 0) }, uDrawC: { value: new THREE.Vector3() },
-  uPen: { value: new THREE.Color('#e85d04') },
+  uPen: { value: new THREE.Color('#ff3340') },
   uWash: { value: 0 },          // 1 = the fills are a light colour wash on paper, as on a drawing
 };
 const DRAW_GLSL = `uniform float uDraw; uniform float uDrawFill; uniform float uDrawSoft; uniform vec4 uDrawDir; uniform vec3 uDrawC; uniform vec3 uPen; uniform float uWash;
@@ -45,8 +47,14 @@ function patchFill(m, o = {}) {
     sh.vertexShader = 'varying vec3 vWD; varying vec3 vLP;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n vWD = (modelMatrix * vec4(transformed, 1.0)).xyz;\n vLP = transformed;');
     sh.fragmentShader = DRAW_GLSL + 'uniform float uGrain; varying vec3 vLP;\nfloat hash3(vec3 p){ p = fract(p * vec3(443.897, 441.423, 437.195)); p += dot(p, p.yzx + 19.19); return fract((p.x + p.y) * p.z); }\n' + sh.fragmentShader
       .replace('#include <clipping_planes_fragment>', 'if (drawOrder(vWD) > uDrawFill) discard;\n#include <clipping_planes_fragment>')
-      .replace('#include <map_fragment>', (o.wash === false ? '#include <map_fragment>' : '#include <map_fragment>\n diffuseColor.rgb = mix(diffuseColor.rgb, mix(mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))), 0.5), vec3(0.975, 0.962, 0.94), 0.4), uWash);')
+      .replace('#include <map_fragment>', (o.wash === false ? '#include <map_fragment>' : '#include <map_fragment>\n diffuseColor.rgb = mix(diffuseColor.rgb, mix(mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))), 0.5), vec3(0.115, 0.115, 0.125), 0.4), uWash);')
         + '\n diffuseColor.rgb *= 1.0 + (hash3(floor(vLP * 140.0)) - 0.5) * uGrain * (1.0 - 0.5 * uWash);');
+    // the night grade: everything settles into neutral greys, and only warm saturated colours survive, as the brand red
+    if (o.grade !== false) sh.fragmentShader = sh.fragmentShader.replace('#include <tonemapping_fragment>', `{ vec3 gc = gl_FragColor.rgb; float gm = max(gc.r, max(gc.g, gc.b));
+        float gl = dot(gc, vec3(0.2126, 0.7152, 0.0722));
+        float gr = smoothstep(0.56, 0.72, (gc.r - max(gc.g, gc.b)) / max(gm, 1e-4));
+        gl_FragColor.rgb = mix(vec3(gl) * vec3(1.0, 0.995, 1.03), vec3(0.78, 0.016, 0.03) * clamp(gl * 4.6, 0.0, 1.35), gr); }
+      #include <tonemapping_fragment>`);
   };
   return m;
 }
@@ -75,7 +83,7 @@ export function ensureEnv() {
   const envScene = new THREE.Scene();
   const c = document.createElement('canvas'); c.width = 4; c.height = 256;
   const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 256);
-  gr.addColorStop(0, '#fffdf9'); gr.addColorStop(0.5, '#f2ece0'); gr.addColorStop(1, '#d6cbb8');
+  gr.addColorStop(0, '#6c6c72'); gr.addColorStop(0.5, '#2c2c30'); gr.addColorStop(1, '#101012');
   g.fillStyle = gr; g.fillRect(0, 0, 4, 256);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
   envScene.add(new THREE.Mesh(new THREE.SphereGeometry(40, 24, 12), new THREE.MeshBasicMaterial({ map: t, side: THREE.BackSide })));
@@ -84,7 +92,7 @@ export function ensureEnv() {
     m.position.set(...p); m.lookAt(0, 0, 0); envScene.add(m);
   };
   card(24, 14, [28, 18, 16], 0xffffff);
-  card(20, 12, [-22, 16, 20], 0xfff5e4);
+  card(20, 12, [-22, 16, 20], 0xf3eeee);
   _studioEnv = new THREE.PMREMGenerator(renderer).fromScene(envScene, 0.03).texture;
   return _studioEnv;
 }
@@ -153,6 +161,8 @@ export function toneMat(hex, o = {}) {
       uOp: { value: op },
       uMode: { value: mode },
       uScale: { value: sc },
+      uTex: { value: o.tex ?? 2.4 },
+      uGlow: { value: new THREE.Color(o.glow ?? '#000000') },
       ...DRAW,
     },
     vertexShader: `varying vec3 vN; varying vec3 vWD; varying vec3 vLP;
@@ -162,7 +172,7 @@ export function toneMat(hex, o = {}) {
         vWD = (modelMatrix * vec4(position, 1.0)).xyz;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }`,
-    fragmentShader: DRAW_GLSL + `uniform vec3 uCol; uniform float uOp; uniform float uMode; uniform float uScale;
+    fragmentShader: DRAW_GLSL + `uniform vec3 uCol; uniform float uOp; uniform float uMode; uniform float uScale; uniform float uTex; uniform vec3 uGlow;
       varying vec3 vN; varying vec3 vLP;
       float h2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float n2(vec2 p){
@@ -177,7 +187,7 @@ export function toneMat(hex, o = {}) {
         float sun = max(dot(n, L1), 0.0);
         float sky = max(dot(n, L2), 0.0);
         float top = clamp(n.y, 0.0, 1.0);
-        float shade = 0.80 + 0.17 * sun + 0.04 * sky + 0.03 * top;
+        float shade = 0.60 + 0.34 * sun + 0.08 * sky + 0.06 * top;
         vec3 p = vLP * uScale;
         vec2 uv = abs(n.y) > 0.7 ? p.xz : (abs(n.x) > 0.7 ? p.zy : p.xy);
         float tex = 0.0;
@@ -215,7 +225,7 @@ export function toneMat(hex, o = {}) {
           // Mode 0: warm paper / lime plaster micro-grain
           tex = (n2(uv * 5.5) - 0.5) * 0.018 + (h2(floor(uv * 90.0)) - 0.5) * 0.016;
         }
-        vec3 col = uCol * (shade + tex);
+        vec3 col = uCol * (shade + tex * uTex) + uGlow;
         gl_FragColor = vec4(col, uOp);
         #include <colorspace_fragment>
       }`,
@@ -249,6 +259,18 @@ export function hullMat(px = 1, color = INK) {
   return m;
 }
 
+// Long edges are cut into short runs. A segment that reaches behind the camera is trimmed at the near plane,
+// and a very long one loses its depth there: it then shows through walls and ceilings as a stray line.
+export function shortSegs(arr, max = 0.9) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += 6) {
+    const dx = arr[i + 3] - arr[i], dy = arr[i + 4] - arr[i + 1], dz = arr[i + 5] - arr[i + 2];
+    const n = Math.max(1, Math.ceil(Math.hypot(dx, dy, dz) / max));
+    for (let k = 0; k < n; k++) out.push(arr[i] + dx * k / n, arr[i + 1] + dy * k / n, arr[i + 2] + dz * k / n, arr[i] + dx * (k + 1) / n, arr[i + 1] + dy * (k + 1) / n, arr[i + 2] + dz * (k + 1) / n);
+  }
+  return out;
+}
+
 // ---------- parts: geometry collected per material, merged, with ink edges on top
 export class Part {
   constructor(parent, pal, line, weights = {}) { this.parent = parent; this.pal = pal; this.line = line; this.weights = weights; this.b = new Map(); }
@@ -272,7 +294,7 @@ export class Part {
       this.parent.add(mesh);
       if (spec.edges !== false) {
         const eg = new THREE.EdgesGeometry(geo, spec.thr ?? 30);
-        const l = new LineSegments2(new LineSegmentsGeometry().fromEdgesGeometry(eg), spec.line || (spec.w && this.weights[spec.w]) || this.line);
+        const l = new LineSegments2(new LineSegmentsGeometry().setPositions(shortSegs(eg.attributes.position.array)), spec.line || (spec.w && this.weights[spec.w]) || this.line);
         this.parent.add(l);
       }
       if (spec.hull) this.parent.add(new THREE.Mesh(geo, spec.hullMat || (spec.hullMat = hullMat(spec.hull === true ? 1 : spec.hull, spec.hullColor))));
@@ -284,7 +306,7 @@ export class Part {
 // loose line segments (hatching, board joints): [[x0,y0,z0,x1,y1,z1], ...]
 export function segs(parent, list, mat) {
   if (!list.length) return null;
-  const g = new LineSegmentsGeometry(); g.setPositions(list.flat());
+  const g = new LineSegmentsGeometry(); g.setPositions(shortSegs(list.flat()));
   const l = new LineSegments2(g, mat); parent.add(l); return l;
 }
 // a dashed line we move every frame

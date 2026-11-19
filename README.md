@@ -1,8 +1,8 @@
-# seofessionals three.js Demo 1
+# three.js Demo 1
 
 Eine Explosionsaxonometrie eines Holzhauses, mit Tusche geplottet. Beim Scrollen landen die sechs Schichten nacheinander in Bauabfolge. Dann weitet sich das Objektiv, bis die Zeichnung zum Raum wird, die Glastür gleitet auf, und Sie gehen hinein und hinauf auf die Galerie.
 
-[**Live ansehen**](https://seofessionals-3js.github.io/seofessionals-threejs-demo-1/?dir=a) · [**Startprompt**](PROMPT.md) · [**Alle Demos**](https://seofessionals-3js.github.io/seofessionals-threejs-demos/)
+[**Live ansehen**](https://seofessionals-3js.github.io/threejs-demo-1/?dir=a) · [**Startprompt**](PROMPT.md) · [**Alle Demos**](https://seofessionals-3js.github.io/threejs-demos/)
 
 Drei Varianten mit demselben Code:
 
@@ -36,6 +36,6 @@ Dann http://localhost:8000/ öffnen. Am besten auf einem Laptop mit aktuellem Br
 
 ## Herkunft und Lizenz
 
-Basiert auf „Exploded House“ aus [flat-to-3d](https://github.com/Sam1983Aing/flat-to-3d) von Samnang Aing, veröffentlicht unter der MIT-Lizenz, und für seofessionals ins Deutsche übersetzt. Die Lizenz liegt unverändert in [LICENSE](LICENSE).
+Basiert auf „Exploded House“ aus [flat-to-3d](https://github.com/Sam1983Aing/flat-to-3d) von Samnang Aing, veröffentlicht unter der MIT-Lizenz, und ins Deutsche übersetzt. Die Lizenz liegt unverändert in [LICENSE](LICENSE).
 
 Alle Büros, Häuser, Adressen und Kontaktdaten in der Demo sind erfunden. three.js (MIT) wird von einem CDN geladen, die Schriften Chakra Petch und IBM Plex Mono von Google Fonts (SIL Open Font License).

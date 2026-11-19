@@ -289,7 +289,7 @@ export async function build(labels) {
       ],
     },
     chrome: {
-      title: 'seofessionals three.js Demo 1 · Geschossweise',
+      title: 'three.js Demo 1 · Geschossweise',
       dwg: 'SEC.500',
       brand: 'Storey', brandSub: 'Massivholzbauten',
       nav: 'Projekte     Tragwerk     Kontakt', cta: 'Sprechen Sie uns an',

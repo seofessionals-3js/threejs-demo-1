@@ -20,50 +20,50 @@ function rb(x0, y0, z0, x1, y1, z1, r = 0.04) {
 
 export async function build(labels) {
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  scene.add(new THREE.HemisphereLight('#fffaf1', '#e8dcc6', 2.4));
+  scene.add(new THREE.HemisphereLight('#ffffff', '#8f8f98', 2.3));
   // the pendant throws a crisp pool on the table once you are inside (no soft glow on the ceiling)
-  const lamp = new THREE.SpotLight('#ffe0ad', 0, 4, 0.62, 0.12, 1.2);
+  const lamp = new THREE.SpotLight('#fff3e6', 0, 4, 0.62, 0.12, 1.2);
   lamp.position.set(TX, 2.05, TZ); lamp.target.position.set(TX, 0, TZ); scene.add(lamp, lamp.target);
   // the sun starts in the south-west, so shadows fall away from the copy, and comes round to the east
   // window by the time you are inside
   const SUN_A = V(-7, 11, 8), SUN_B = V(10, 7.2, 3.2);
-  const sun = new THREE.DirectionalLight('#fff4e4', 2.6);
+  const sun = new THREE.DirectionalLight('#ffffff', 2.6);
   sun.position.copy(SUN_A); sun.castShadow = true; sun.shadow.mapSize.set(4096, 4096);
   Object.assign(sun.shadow.camera, { left: -13, right: 13, top: 13, bottom: -13, near: 1, far: 45 });
   sun.shadow.bias = -0.0003; sun.shadow.normalBias = 0.025; sun.target.position.set(0, 0, -1.5);
   scene.add(sun, sun.target);
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(90, 90).rotateX(-Math.PI / 2), new THREE.ShadowMaterial({ color: '#4a3a28', opacity: 0.08 }));
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(90, 90).rotateX(-Math.PI / 2), new THREE.ShadowMaterial({ color: '#000000', opacity: 0.3 }));
   ground.position.y = -0.125; ground.receiveShadow = true; scene.add(ground);
 
   const T = buildTextures();
   const PAL = {
-    plaster: { mat: stdMat('#ece3d3', { rough: 0.9, map: T.plaster, bumpMap: T.plasterBump, bumpScale: 0.004 }), uvScale: 0.35 },
-    ceiling: { mat: stdMat('#efe8db', { rough: 0.92, map: T.plaster, bumpMap: T.plasterBump, bumpScale: 0.003, emissive: '#efe4cf', emissiveIntensity: 0.22 }), uvScale: 0.35 },
-    base: { mat: stdMat('#d9d1c3', { rough: 0.88, bumpMap: T.plasterBump, bumpScale: 0.005 }), uvScale: 0.5 },
-    floor: { mat: stdMat('#ffffff', { map: T.floor.map, bumpMap: T.floor.bump, bumpScale: 0.024, rough: 0.52, env: 0.55 }), thr: 60 },
-    oak: { mat: stdMat('#ffffff', { map: T.oak.map, bumpMap: T.oak.bump, bumpScale: 0.018, rough: 0.56, env: 0.5 }), uvScale: 0.8 },
-    walnut: { mat: stdMat('#ffffff', { map: T.walnut.map, bumpMap: T.walnut.bump, bumpScale: 0.02, rough: 0.44, env: 0.6 }), uvScale: 0.8 },
-    sage: { mat: stdMat('#87987d', { rough: 0.58, bumpMap: T.oak.bump, bumpScale: 0.008 }), uvScale: 0.8 },
-    tile: { mat: stdMat('#ffffff', { map: T.zellige.map, bumpMap: T.zellige.bump, bumpScale: 0.022, rough: 0.24, env: 0.68 }), thr: 60 },
-    steel: { mat: stdMat('#a4a29c', { rough: 0.32, metal: 0.72, env: 0.75 }) },
-    linen: { mat: stdMat('#ddd4c4', { rough: 0.92, bumpMap: T.fabricBump, bumpScale: 0.02 }), uvScale: 2.2 },
-    cushion: { mat: stdMat('#ddd4c4', { rough: 0.92, bumpMap: T.fabricBump, bumpScale: 0.02 }), uvScale: 2.2, hull: 1, thr: 50 },
-    pillow: { mat: stdMat('#b2593a', { rough: 0.88, bumpMap: T.fabricBump, bumpScale: 0.022 }), uvScale: 2.2, hull: 1, thr: 50 },
-    rust: { mat: stdMat('#b2593a', { rough: 0.78, bumpMap: T.plasterBump, bumpScale: 0.012 }), uvScale: 1.0 },
-    ink: { mat: stdMat('#282622', { rough: 0.42, metal: 0.35 }) },
-    frame: { mat: stdMat('#363530', { rough: 0.46, metal: 0.25 }) },
-    glass: { mat: stdMat('#c4d6da', { opacity: 0.2, rough: 0.08, env: 0.8 }), cast: false, edges: false },
-    rug: { mat: stdMat('#ffffff', { map: T.rug.map, bumpMap: T.rug.bump, bumpScale: 0.034, rough: 0.92 }), thr: 60 },
-    shade: { mat: stdMat('#f6f0e2', { emissive: '#f3d9a6', emissiveIntensity: 0.38, bumpMap: T.fabricBump, bumpScale: 0.01 }), uvScale: 1.5, hull: 1, edges: false },
-    leaf: { mat: stdMat('#5f7f4a', { rough: 0.78, side: THREE.DoubleSide }), w: 'mid', thr: 20 },
-    pot: { mat: stdMat('#c4a585', { rough: 0.82, bumpMap: T.plasterBump, bumpScale: 0.016 }), uvScale: 1.0, hull: 1 },
-    cream: { mat: stdMat('#f1ebdf', { rough: 0.38 }), hull: 1 },
+    plaster: { mat: stdMat('#2b2b30', { rough: 0.9, map: T.plaster, bumpMap: T.plasterBump, bumpScale: 0.004 }), uvScale: 0.35 },
+    ceiling: { mat: stdMat('#303035', { rough: 0.92, map: T.plaster, bumpMap: T.plasterBump, bumpScale: 0.003, emissive: '#1c1c20', emissiveIntensity: 0.22 }), uvScale: 0.35 },
+    base: { mat: stdMat('#1b1b1e', { rough: 0.88, bumpMap: T.plasterBump, bumpScale: 0.005 }), uvScale: 0.5 },
+    floor: { mat: stdMat('#5c5c62', { map: T.floor.map, bumpMap: T.floor.bump, bumpScale: 0.024, rough: 0.52, env: 0.55 }), thr: 60 },
+    oak: { mat: stdMat('#7c7c82', { map: T.oak.map, bumpMap: T.oak.bump, bumpScale: 0.018, rough: 0.56, env: 0.5 }), uvScale: 0.8 },
+    walnut: { mat: stdMat('#8e8e94', { map: T.walnut.map, bumpMap: T.walnut.bump, bumpScale: 0.02, rough: 0.44, env: 0.6 }), uvScale: 0.8 },
+    sage: { mat: stdMat('#1a1a1d', { rough: 0.58, bumpMap: T.oak.bump, bumpScale: 0.008 }), uvScale: 0.8 },
+    tile: { mat: stdMat('#e2e2e6', { map: T.zellige.map, bumpMap: T.zellige.bump, bumpScale: 0.022, rough: 0.24, env: 0.68 }), thr: 60 },
+    steel: { mat: stdMat('#8e8e94', { rough: 0.32, metal: 0.72, env: 0.75 }) },
+    linen: { mat: stdMat('#dcd9d4', { rough: 0.92, bumpMap: T.fabricBump, bumpScale: 0.02 }), uvScale: 2.2 },
+    cushion: { mat: stdMat('#dcd9d4', { rough: 0.92, bumpMap: T.fabricBump, bumpScale: 0.02 }), uvScale: 2.2, hull: 1, thr: 50 },
+    pillow: { mat: stdMat('#c2202b', { rough: 0.88, bumpMap: T.fabricBump, bumpScale: 0.022 }), uvScale: 2.2, hull: 1, thr: 50 },
+    rust: { mat: stdMat('#c2202b', { rough: 0.78, bumpMap: T.plasterBump, bumpScale: 0.012 }), uvScale: 1.0 },
+    ink: { mat: stdMat('#0f0f11', { rough: 0.42, metal: 0.35 }) },
+    frame: { mat: stdMat('#141416', { rough: 0.46, metal: 0.25 }) },
+    glass: { mat: stdMat('#dfe6ea', { opacity: 0.2, rough: 0.08, env: 0.8 }), cast: false, edges: false },
+    rug: { mat: stdMat('#a0a0a0', { map: T.rug.map, bumpMap: T.rug.bump, bumpScale: 0.034, rough: 0.92 }), thr: 60 },
+    shade: { mat: stdMat('#fff8ee', { emissive: '#f2ece2', emissiveIntensity: 0.55, bumpMap: T.fabricBump, bumpScale: 0.01 }), uvScale: 1.5, hull: 1, edges: false },
+    leaf: { mat: stdMat('#2f3431', { rough: 0.78, side: THREE.DoubleSide }), w: 'mid', thr: 20 },
+    pot: { mat: stdMat('#d6d3ce', { rough: 0.82, bumpMap: T.plasterBump, bumpScale: 0.016 }), uvScale: 1.0, hull: 1 },
+    cream: { mat: stdMat('#e9e6e1', { rough: 0.38 }), hull: 1 },
     artA: { mat: stdMat('#ffffff', { map: T.artA, bumpMap: T.fabricBump, bumpScale: 0.012, rough: 0.78 }) },
     artB: { mat: stdMat('#ffffff', { map: T.artB, bumpMap: T.fabricBump, bumpScale: 0.012, rough: 0.78 }) },
     b1: { mat: stdMat('#a14a33', { rough: 0.7 }), w: 'mid' }, b2: { mat: stdMat('#2f4b5e', { rough: 0.7 }), w: 'mid' }, b3: { mat: stdMat('#d9c8a1', { rough: 0.75 }), w: 'mid' }, b4: { mat: stdMat('#5d6c3d', { rough: 0.7 }), w: 'mid' }, b5: { mat: stdMat('#272623', { rough: 0.65 }), w: 'mid' },
   };
-  const line = lineMat({ w: 0.95, color: '#2a2622', opacity: 0.88 });
-  const W = { mid: lineMat({ w: 0.6, color: '#2a2622', opacity: 0.6 }) };
+  const line = lineMat({ w: 0.95, color: INK, opacity: 0.88 });
+  const W = { mid: lineMat({ w: 0.6, color: INK, opacity: 0.6 }) };
   const mkPart = g => new Part(g, PAL, line, W);
 
   // ---- floor and the things that stand on it
@@ -240,7 +240,7 @@ export async function build(labels) {
       cap = '<span class="lv">ANSICHT C // SÜDEINGANG</span><span class="t">C · DIE TÜRWAND</span><span class="m">OK-02 Eichentür &nbsp;·&nbsp; 900 × 2 200 &nbsp;·&nbsp; Wand 6 240</span>';
       capOp = win(p, 0.66, 0.70) * (1 - win(p, 0.79, 0.82));
     } else if (p < 0.95) {
-      cap = '<span class="lv">ANSICHT A // NORDWAND</span><span class="t">DIE SALBEIGRÜNE KÜCHE</span><span class="m">SG-01 Salbeilack &nbsp;·&nbsp; ZL-03 Zellige &nbsp;·&nbsp; OK-02 Eiche</span>';
+      cap = '<span class="lv">ANSICHT A // NORDWAND</span><span class="t">DIE SCHWARZE KÜCHE</span><span class="m">SG-01 Schwarzlack &nbsp;·&nbsp; ZL-03 Zellige &nbsp;·&nbsp; OK-02 Eiche</span>';
       capOp = win(p, 0.84, 0.87) * (1 - win(p, 0.92, 0.95));
     } else {
       cap = '<span class="lv">ANSICHT B // SITZFENSTER OST</span><span class="t">ESSPLATZ &amp; FENSTERBANK</span><span class="m">WN-05 Nussbaumtisch &nbsp;·&nbsp; PD-06 Papierpendelleuchte &nbsp;·&nbsp; LN-04 Leinen</span>';
@@ -345,7 +345,7 @@ export async function build(labels) {
       clampX: [-3.2, 3.2], clampZ: [-2.6, 2.8],
       axoDot: [1.85, 2.3], axoAng: -1.95,
       zones: [
-        { stop: 'kitchen', p: 0.91, tag: 'ANS. A // SALBEI-KÜCHE', x: -3.0, y: -2.4, w: 4.5, h: 2.4 },
+        { stop: 'kitchen', p: 0.91, tag: 'ANS. A // SCHWARZE KÜCHE', x: -3.0, y: -2.4, w: 4.5, h: 2.4 },
         { stop: 'window', p: 0.99, tag: 'ANS. B // SITZFENSTER', x: 1.5, y: -2.4, w: 1.5, h: 3.4 },
         { stop: 'door', p: 0.78, tag: 'ANS. C // TÜRWAND', x: -3.0, y: 0.0, w: 6.0, h: 2.4 },
       ],
@@ -376,7 +376,7 @@ export async function build(labels) {
 // up with their wall) and 'ground' (elevation titles, finishes schedules, title block, which stay on the paper).
 function drawSheet(SH, layer) {
   const S = SH.s, X = x => (x - SH.x0) * S, Y = z => (z - SH.z0) * S;
-  const ACC = '#e85d04';
+  const ACC = '#ff3b47';
   return canvasTex(Math.round(SH.w * S), Math.round(SH.d * S), (g) => {
     g.strokeStyle = INK; g.fillStyle = INK; g.lineCap = 'round';
     const font = (m, wt = 500) => { g.font = `${wt} ${Math.round(m * S)}px "IBM Plex Mono"`; };
@@ -429,7 +429,7 @@ function drawSheet(SH, layer) {
       txt('P  PLAN  1:50', -2.85, -2.16, 0.2, 'left');
     } else {
       title('A', 'KÜCHENWAND', 3.5, -5.1);
-      schedule(3.5, -4.55, [['SG-01', 'SALBEILACK'], ['OK-02', 'EICHE GEÖLT'], ['ZL-03', 'ZELLIGE 100 × 100']]);
+      schedule(3.5, -4.55, [['SG-01', 'SCHWARZLACK'], ['OK-02', 'EICHE GEÖLT'], ['ZL-03', 'ZELLIGE 100 × 100']]);
       title('B', 'FENSTERWAND', 3.4, 2.9);
       schedule(6.3, -1.2, [['OK-02', 'EICHE GEÖLT'], ['LN-04', 'LEINEN'], ['ST-09', 'STAHLRAHMEN']]);
       title('C', 'TÜRWAND', -1.4, 6.3);

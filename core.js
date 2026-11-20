@@ -108,6 +108,7 @@ function patchFill(m, o = {}) {
     if (prev) prev(sh, r);
     addDraw(sh); addLive(sh);
     sh.uniforms.uGrain = { value: grainAmt };
+    sh.uniforms.uFlat = { value: o.flat ?? 0.5 };      // how much of the flat local colour stays in the coloured picture
     sh.uniforms.uReal = { value: real }; sh.uniforms.uBase = { value: base }; sh.uniforms.uSway = { value: o.sway ?? 0 };
     sh.uniforms.uIsland = { value: new THREE.Vector4(...(o.island || [0, 0, 1, 1])) }; sh.uniforms.uIslandMode = { value: o.island?.[4] ?? -1 };
     sh.vertexShader = LIVE_GLSL + 'uniform float uSway; varying vec3 vWD; varying vec3 vLP;\n' + sh.vertexShader
@@ -116,7 +117,7 @@ function patchFill(m, o = {}) {
     const realCode = o.ground
       ? 'vec3 rc = groundCol(vWD.xz, clamp(dot(texel, vec3(0.333)) * 1.6 - 0.1, 0.0, 1.0));'
       : 'vec3 rc = texel * uReal;';
-    sh.fragmentShader = DRAW_GLSL + LIVE_GLSL + 'uniform float uGrain; uniform vec3 uReal; uniform vec3 uBase; uniform vec4 uIsland; uniform float uIslandMode; varying vec3 vLP; vec2 gLive;\nfloat hash3(vec3 p){ p = fract(p * vec3(443.897, 441.423, 437.195)); p += dot(p, p.yzx + 19.19); return fract((p.x + p.y) * p.z); }\n' + sh.fragmentShader
+    sh.fragmentShader = DRAW_GLSL + LIVE_GLSL + 'uniform float uGrain; uniform float uFlat; uniform vec3 uReal; uniform vec3 uBase; uniform vec4 uIsland; uniform float uIslandMode; varying vec3 vLP; vec2 gLive;\nfloat hash3(vec3 p){ p = fract(p * vec3(443.897, 441.423, 437.195)); p += dot(p, p.yzx + 19.19); return fract((p.x + p.y) * p.z); }\n' + sh.fragmentShader
       .replace('#include <clipping_planes_fragment>', 'if (drawOrder(vWD) > uDrawFill) discard;\n gLive = liveAt(vWD);\n#include <clipping_planes_fragment>')
       .replace('#include <map_fragment>', '#include <map_fragment>\n { vec3 texel = diffuseColor.rgb / max(uBase, vec3(1e-3)); ' + realCode + ' diffuseColor.rgb = mix(diffuseColor.rgb, rc, gLive.x); }'
         + (o.wash === false ? '' : '\n diffuseColor.rgb = mix(diffuseColor.rgb, mix(mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))), 0.5), vec3(0.115, 0.115, 0.125), 0.4), uWash);')
@@ -126,7 +127,7 @@ function patchFill(m, o = {}) {
     const grade = o.grade === false ? '' : `{ vec3 gc = gl_FragColor.rgb; float gm = max(gc.r, max(gc.g, gc.b));
         float gl = dot(gc, vec3(0.2126, 0.7152, 0.0722));
         float gr = smoothstep(0.56, 0.72, (gc.r - max(gc.g, gc.b)) / max(gm, 1e-4));
-        gl_FragColor.rgb = mix(mix(vec3(gl) * vec3(1.0, 0.995, 1.03), vec3(0.78, 0.016, 0.03) * clamp(gl * 4.6, 0.0, 1.35), gr), mix(gc * 1.12, diffuseColor.rgb * 0.95, 0.5), gLive.x); }`;
+        gl_FragColor.rgb = mix(mix(vec3(gl) * vec3(1.0, 0.995, 1.03), vec3(0.78, 0.016, 0.03) * clamp(gl * 4.6, 0.0, 1.35), gr), mix(gc * 1.12, diffuseColor.rgb * 0.95, uFlat), gLive.x); }`;
     const island = 'if (uIslandMode > -0.5) { float fd = 1.0 - smoothstep(0.5, 1.0, length((vWD.xz - uIsland.xy) / uIsland.zw)); gl_FragColor.a *= uIslandMode > 0.5 ? gLive.x * fd : mix(1.0, fd, gLive.x); }';
     sh.fragmentShader = sh.fragmentShader.replace('#include <tonemapping_fragment>', grade + '\n gl_FragColor.rgb += uEdge * gLive.y * 0.28;\n' + island + '\n #include <tonemapping_fragment>');
   };
@@ -253,8 +254,13 @@ export function toneMat(hex, o = {}) {
       uRealGlow: { value: new THREE.Color(o.realGlow ?? '#000000') },
       uOpR: { value: o.realOp ?? op },
       uSway: { value: o.sway ?? 0 },
+      // o.realMap: a picture of the surface it has in colour (wood, brick), laid on in metres: o.mapM is the
+      // size of one tile, o.mapRot turns it a quarter on the walls (x: grain across, y: grain up)
+      uRealMap: { value: o.realMap ?? null },
+      uMapM: { value: new THREE.Vector3(1 / (o.mapM ?? 1), o.mapRot ?? 0, o.mapOff ?? 0) },
       ...DRAW, ...LIVE,
     },
+    defines: o.realMap ? { REAL_MAP: '' } : {},
     vertexShader: LIVE_GLSL + `uniform float uSway; varying vec3 vN; varying vec3 vWD; varying vec3 vLP;
       void main(){
         vN = normalize(mat3(modelMatrix) * normal);
@@ -267,6 +273,14 @@ export function toneMat(hex, o = {}) {
     fragmentShader: DRAW_GLSL + LIVE_GLSL + `uniform vec3 uCol; uniform float uOp; uniform float uMode; uniform float uScale; uniform float uTex; uniform vec3 uGlow;
       uniform vec3 uReal; uniform float uRealMode; uniform float uRealTex; uniform vec3 uRealGlow; uniform float uOpR;
       varying vec3 vN; varying vec3 vLP;
+      #ifdef REAL_MAP
+      uniform sampler2D uRealMap; uniform vec3 uMapM;
+      vec3 realSurf(vec3 n) {
+        vec2 mv = abs(n.y) > 0.7 ? vec2(vLP.x, -vLP.z) : (abs(n.x) > 0.7 ? vec2(-vLP.z * sign(n.x), vLP.y) : vec2(vLP.x * sign(n.z), vLP.y));
+        if (uMapM.y > 0.5) mv = vec2(mv.y, -mv.x);
+        return texture2D(uRealMap, mv * uMapM.x + uMapM.z).rgb;
+      }
+      #endif
       float h2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float n2(vec2 p){
         vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
@@ -339,7 +353,11 @@ export function toneMat(hex, o = {}) {
         }
         vec3 col = uCol * (shade + texOf(uMode, p, uv, top) * uTex) + uGlow;
         if (lv.x > 0.002) {
-          vec3 cr = uReal * dayLight(n) * (1.0 + texOf(uRealMode, p, uv, top) * uRealTex) + uRealGlow * (0.6 + 0.4 * uLive);
+          vec3 rc = uReal;
+          #ifdef REAL_MAP
+          rc *= realSurf(n);
+          #endif
+          vec3 cr = rc * dayLight(n) * (1.0 + texOf(uRealMode, p, uv, top) * uRealTex) + uRealGlow * (0.6 + 0.4 * uLive);
           col = mix(col, cr, lv.x);
         }
         gl_FragColor = vec4(col + uEdge * lv.y * 0.3, mix(uOp, uOpR, lv.x));

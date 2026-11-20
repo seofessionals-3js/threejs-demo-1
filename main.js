@@ -8,9 +8,10 @@ const DRIVE = Q.has('drive');                         // a recorder sets time an
 const T_FIXED = Q.has('t') ? parseFloat(Q.get('t')) : (FIXED != null ? 99 : null);
 const CHAIN = Q.has('chain');                         // arrived from the sheet before
 const LIVEONLY = FIXED != null || DRIVE;              // stills and recordings: no autoplay, no chaining
-// the three sheets play one after another, and the last one hands back to the first
+// the three sheets play one after another; after the last one the portfolio goes on with Demo 2
 const SEQ = [{ dir: 'a', no: '01', name: 'Planblatt' }, { dir: 'b', no: '02', name: 'Abwicklung' }, { dir: 'c', no: '03', name: 'Geschossweise' }];
-const SI = Math.max(0, SEQ.findIndex(s => s.dir === DIR)), NEXT = SEQ[(SI + 1) % SEQ.length];
+const SI = Math.max(0, SEQ.findIndex(s => s.dir === DIR));
+const NEXT = SI < SEQ.length - 1 ? SEQ[SI + 1] : { href: '/threejs-demo-2/?autoplay=1', no: '02', name: 'three.js Demo 2', sub: 'Das Haus im Schnitt', kicker: 'three.js Portfolio · Weiter mit' };
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 if (!LIVEONLY) scrollTo(0, 0);
 
@@ -149,9 +150,10 @@ addEventListener('keydown', e => {
 // ---- the hand-over to the next sheet: hold, let the colour drain, un-plot, cover, and go
 const X = S.xfer || {};
 const MODES = { wipe: 1, iris: 2, blinds: 3, dissolve: 4 };
-const OUT_DUR = 2.4;
+const OUT_DUR = 1.7;
 let endT = -1, outT = -1, goTo = NEXT, gone = false, forceGo = false;
-const holdT = () => forceGo ? 0 : (playing ? 0.8 : 0.5);
+const holdT = () => forceGo ? 0 : (playing ? 0.5 : 0.4);
+const DRAIN_AT = () => holdT() + (forceGo ? 0 : (LV.out.delay ?? 0));     // a sheet can keep its colour a little into the swirl
 // the way back out: from the last room the camera swirls round and out to the front of the building while the
 // colour drains away, then the hand-over runs from there
 const SW = S.swirl, SW_DUR = SW?.dur ?? 4.2;
@@ -173,8 +175,8 @@ function swirl(cs, u) {
   cs.h = 2 * Math.hypot(pos[0] - look[0], pos[1] - look[1], pos[2] - look[2]) * Math.tan(cs.fov * Math.PI / 360);
   cs.sx = lerp(cs.sx || 0, 0, e); cs.sy = lerp(cs.sy || 0, SW.sy ?? -0.04, e);
 }
-const xfer = $('xfer');
-function setXfer(s) { $('xferNo').textContent = s.no; $('xferName').textContent = s.name; }
+const xfer = $('xfer'), xferK = xfer.querySelector('.xk'), XK0 = xferK?.textContent;
+function setXfer(s) { $('xferNo').textContent = s.no; $('xferName').textContent = s.name; if (xferK) xferK.textContent = s.kicker || XK0; }
 // the sheet tabs take the same way out, only quicker
 dirLinks.forEach(a => a.addEventListener('click', e => {
   if (LIVEONLY) return;
@@ -185,7 +187,8 @@ dirLinks.forEach(a => a.addEventListener('click', e => {
 }));
 function go() {
   if (gone) return; gone = true;
-  location.href = `?dir=${goTo.dir}&chain=1&play=${playing ? 1 : 0}`;
+  // the next sheet or demo always starts playing by itself; a tab you clicked keeps your choice
+  location.href = goTo.href || `?dir=${goTo.dir}&chain=1&play=${!forceGo || playing ? 1 : 0}`;
 }
 const uiEls = ['ui', 'labels', 'leaders', 'dims', 'cad-frame'].map($).filter(Boolean);
 
@@ -238,7 +241,7 @@ const t0 = performance.now();
 let wantLive = false;
 function step() {
   // the colour comes in once the sheet reaches its moment and stays until the hand-over drains it
-  const draining = endT >= 0 && endT >= holdT();
+  const draining = endT >= 0 && endT >= DRAIN_AT();
   if (!wantLive && p >= LV.at && !draining) wantLive = true;
   if (wantLive && (p < LV.at - 0.03 || draining)) wantLive = false;
   if (FIXED != null && T_FIXED != null) {
@@ -253,12 +256,12 @@ function step() {
   LIVE.uSunDir.value.set(SUN0.x * Math.cos(sw) - SUN0.z * Math.sin(sw), SUN0.y, SUN0.x * Math.sin(sw) + SUN0.z * Math.cos(sw));
   S.liveHook?.(LIVE.uLive.value, T);
 
-  const st = S.update(p, T) || {};
+  const swU = LIVEONLY && Q.has('swirl') && SW ? parseFloat(Q.get('swirl')) : swirlU();   // stills can freeze the swirl
+  const st = S.update(p, T, swU) || {};
   const lab = intro(T);
   labels.items.forEach((it, i) => { it.op *= lab(it.order ?? i); });
   const camState = camAt(S.keys, p);
   const inU = 1 - easeOut(win(T, 0.05, 3.7)), outU = outT >= 0 ? ease(win(outT, 0, OUT_DUR)) : 0;
-  const swU = LIVEONLY && Q.has('swirl') && SW ? parseFloat(Q.get('swirl')) : swirlU();   // stills can freeze the swirl
   if (swU > 0) swirl(camState, swU);
   if (!LIVEONLY && (inU > 0 || outU > 0)) S.camFx?.(camState, inU, outU);
   window.__inspect?.(camState);                                                // a look closer, for checking details
@@ -272,7 +275,7 @@ function step() {
   $('counter').innerHTML = st.counter || '';
   $('legend').innerHTML = st.legend || ''; $('legend').style.opacity = st.legendOp ?? 0;
   let hint = st.hint ?? C.hint;
-  if (endT >= 0 && outT < 0) hint = `Weiter: ${goTo.no} · ${goTo.name}`;
+  if (endT >= 0 && outT < 0) hint = goTo.href ? `Weiter: Demo 2 · ${goTo.sub}` : `Weiter: ${goTo.no} · ${goTo.name}`;
   else if (playing && T > INTRO_END && hint) hint = 'Läuft von selbst · Scrollen übernimmt';
   if ($('hint').textContent !== hint) $('hint').textContent = hint;
   const hw = document.querySelector('.hint-wrap');
@@ -317,15 +320,15 @@ function step() {
   // the way out: the page chrome steps back, the drawing un-plots itself, this sheet's cover closes, the
   // title of the next sheet comes up, and the next sheet loads under it
   if (outT >= 0) {
-    const ui = 1 - win(outT, 0, 0.5);
+    const ui = 1 - win(outT, 0, 0.4);
     for (const el of uiEls) el.style.opacity = ui;
     const span = D.max - D.min + 2;
-    DRAW.uDrawFill.value = D.min - 1 + (1 - ease(win(outT, 0.05, 1.05))) * (span + 1);
-    DRAW.uDraw.value = D.min - 1 + (1 - ease(win(outT, 0.35, 1.6))) * (span + DRAW.uDrawSoft.value + 1);
-    FX.uMode.value = MODES[X.out?.mode] || 4; FX.uT.value = ease(win(outT, 0.95, 2.0));
+    DRAW.uDrawFill.value = D.min - 1 + (1 - ease(win(outT, 0.05, 0.75))) * (span + 1);
+    DRAW.uDraw.value = D.min - 1 + (1 - ease(win(outT, 0.25, 1.1))) * (span + DRAW.uDrawSoft.value + 1);
+    FX.uMode.value = MODES[X.out?.mode] || 4; FX.uT.value = ease(win(outT, 0.6, 1.35));
     if (X.out?.dir) FX.uDir.value.set(...X.out.dir);
     if (X.out?.c) FX.uC.value.set(...X.out.c);
-    setXfer(goTo); xfer.style.opacity = win(outT, 1.85, 2.3);
+    setXfer(goTo); xfer.style.opacity = win(outT, 1.25, 1.6);
   }
   FX.uAspect.value = ctx.W / ctx.H; FX.uFxTime.value = T;
   renderer.render(scene, camera);
@@ -347,7 +350,8 @@ function frame(now = performance.now(), loop = true) {
       else {
         endT += dt;
         const sw = forceGo || !SW ? 0 : SW_DUR;
-        if (endT > hold + sw && (live.state === 'off' || endT > hold + Math.max(sw, LV.out.dur * (live.fast ? 0.28 : 1)) + 0.6)) outT = 0;
+        const drainEnd = DRAIN_AT() + LV.out.dur * (live.fast ? 0.28 : 1);
+        if (endT > hold + sw && (live.state === 'off' || endT > Math.max(hold + sw, drainEnd) + 0.6)) outT = 0;
       }
     }
     if (outT >= 0) { outT += dt; if (outT > OUT_DUR + 0.1) go(); }

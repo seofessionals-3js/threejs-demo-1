@@ -6,6 +6,7 @@ import {
   THREE, Part, bx, cyl, ball, panel, M, V, D2R, clamp, lerp, ease, ease2, win,
   scene, lineMat, toneMat, segs, liveLine, eyeKey, camAt, canvasTex, ctx, ACCENT, INK, PAPER, patchFill,
 } from './core.js';
+import { oakPlanks, oakBoard, whiteBrick, latticeRug } from './tex-a.js';
 
 // ---- the house (metres). x runs east, z south, y up. The glass front faces east onto a terrace.
 const FL = 0.3, F = FL + 0.03;                                          // slab top, finished ground floor
@@ -63,32 +64,36 @@ function slope(side, x0, x1, w0, w1, z0, tEnd) {
 export async function build(labels, dims) {
   const dk = lineMat({ w: 0.95, color: '#151517', opacity: 0.9 });       // ink for the light things
   const light = { line: dk, hullColor: '#151517' };
-  // every material has its drawn tone and, after "real", the colour it has when the house comes alive:
-  // spruce CLT inside, smoked oak floors, charred larch outside, black zinc on top, warm lamps
+  // every material has its drawn tone and, after "real", the surface it has when the house comes alive: warm
+  // oiled oak boards on the floors, the ceilings and all round the outside, white plaster and white painted brick
+  // inside, white joinery, a cream rug with a black lattice, light zinc on top, warm lamps
   const swayLine = lineMat({ w: 0.9, sway: 0.016 });
+  const TX = { planks: oakPlanks(), pale: oakPlanks({ seed: 7, base: [226, 204, 174], seams: 0.3 }), deck: oakPlanks({ seed: 11, w: 0.14, tile: 2.24, base: [196, 162, 124], seams: 0.6 }), board: oakBoard(), brick: whiteBrick(), rug: latticeRug() };
+  const wood = (t, m, o = {}) => ({ real: '#ffffff', realMap: t, mapM: m, realTex: 0, ...o });
   const PAL = {
-    wall: { mat: toneMat('#26262a', { mode: 0, scale: 1.0, tex: 1.6, real: '#efe3cf', realMode: 0, realTex: 1.2 }) },
-    ceil: { mat: toneMat('#2c2c30', { mode: 1, scale: 0.9, tex: 1.4, real: '#e8cfa6', realTex: 1.4 }) },
-    floor: { mat: toneMat('#3f3b37', { mode: 1, scale: 1.2, real: '#dcc29a', realTex: 1.8 }) },
-    deck: { mat: toneMat('#2a2826', { mode: 1, scale: 1.8, real: '#e6d8c0', realMode: 2, realTex: 1.0 }) },
+    wall: { mat: toneMat('#26262a', { mode: 0, scale: 1.0, tex: 1.6, real: '#f4f1ec', realMode: 0, realTex: 1.0 }) },
+    ceil: { mat: toneMat('#2c2c30', { mode: 1, scale: 0.9, tex: 1.4, ...wood(TX.pale, 2.28) }) },
+    floor: { mat: toneMat('#3f3b37', { mode: 1, scale: 1.2, ...wood(TX.planks, 2.28) }) },
+    deck: { mat: toneMat('#2a2826', { mode: 1, scale: 1.8, ...wood(TX.deck, 2.24, { mapRot: 1 }) }) },
     pool: { mat: toneMat('#8a8178', { mode: 0, opacity: 0.22, tex: 0, real: '#ffe6b8', realOp: 0.16 }), edges: false },
     firepool: { mat: toneMat('#c02a2a', { mode: 0, opacity: 0.11, tex: 0, real: '#ffb27a', realOp: 0.14 }), edges: false },
-    oak: { mat: toneMat('#57514b', { mode: 1, scale: 1.6, real: '#d2ad7e', realTex: 1.8 }) },
-    concrete: { mat: toneMat('#58585d', { mode: 2, scale: 1.0, tex: 1.8, real: '#efe7da', realTex: 1.2 }) },
+    oak: { mat: toneMat('#57514b', { mode: 1, scale: 1.6, ...wood(TX.board, 0.9) }) },
+    concrete: { mat: toneMat('#58585d', { mode: 2, scale: 1.0, tex: 1.8, real: '#ebe7e0', realTex: 1.0 }) },
+    brick: { mat: toneMat('#58585d', { mode: 2, scale: 1.0, tex: 1.8, ...wood(TX.brick, 1.2) }) },
     glass: { mat: toneMat('#e6ecf0', { opacity: 0.085, mode: 5, real: '#c2e8f0', realOp: 0.34 }) },
-    clad: { mat: toneMat('#161618', { mode: 1, scale: 2.2, tex: 3.2, real: '#f2ebdf', realMode: 0, realTex: 1.0 }), w: 'thin' },
+    clad: { mat: toneMat('#161618', { mode: 1, scale: 2.2, tex: 3.2, ...wood(TX.board, 1.2) }), w: 'thin' },
     seam: { mat: toneMat('#1c1c1f', { mode: 3, scale: 1.5, tex: 3.0, real: '#d3cdc2', realTex: 1.6 }), w: 'thin' },
-    under: { mat: toneMat('#34343a', { mode: 1, scale: 1.0, tex: 1.6, real: '#ead9b9', realTex: 1.4 }) },
-    rafter: { mat: toneMat('#6a645d', { mode: 1, scale: 2.0, real: '#ebcfa2', realTex: 1.6 }), w: 'mid' },
+    under: { mat: toneMat('#34343a', { mode: 1, scale: 1.0, tex: 1.6, ...wood(TX.pale, 2.28) }) },
+    rafter: { mat: toneMat('#6a645d', { mode: 1, scale: 2.0, ...wood(TX.board, 1.2, { real: '#fff3e0', mapRot: 1 }) }), w: 'mid' },
     steel: { mat: toneMat('#2b2b30', { mode: 3, scale: 2.0, real: '#3e4145' }), w: 'thin' },
     pipe: { mat: toneMat('#222226', { mode: 3, scale: 2.0, real: '#3a3c3f' }), w: 'thin', hull: 1 },
     rod: { mat: toneMat('#3a3a40', { mode: 3, scale: 2.0, tex: 1, real: '#4a4d51' }), edges: false, hull: 0.8 },
-    kfront: { mat: toneMat('#19191c', { mode: 0, scale: 1.0, tex: 1.2, real: '#dcc39b' }) },
+    kfront: { mat: toneMat('#19191c', { mode: 0, scale: 1.0, tex: 1.2, real: '#f2efe9', realTex: 0.6 }) },
     bright: { mat: toneMat('#e7e4df', { mode: 0, tex: 0.9, real: '#f8f4ec', realMode: 2, realTex: 0.6 }), ...light },
     leaf: { mat: toneMat('#2b2f2c', { side: THREE.DoubleSide, mode: 0, real: '#8aa66c', sway: 0.016 }), line: swayLine, thr: 20 },
     frame: { mat: toneMat('#17171a', { mode: 1, scale: 2.0, real: '#2e2e2f' }) },
     redframe: { mat: toneMat('#c8141f', { mode: 3, scale: 2.0, tex: 1.2, real: '#2e2e2f' }) },
-    rug: { mat: toneMat('#4b4b51', { mode: 4, scale: 1.0, tex: 1.8, real: '#e8dfcc' }) },
+    rug: { mat: toneMat('#4b4b51', { mode: 4, scale: 1.0, tex: 1.8, ...wood(TX.rug, 1.2, { realTex: 0.8 }) }) },
     soft: { mat: toneMat('#dcd9d3', { mode: 4, scale: 1.0, tex: 0.9, real: '#f7f3ec' }), hull: 1, ...light },
     cushion: { mat: toneMat('#e2dfd9', { mode: 4, scale: 1.4, tex: 0.9, real: '#f4efe7' }), hull: 1, thr: 50, ...light },
     rouge: { mat: toneMat('#cc1f2b', { mode: 4, scale: 1.4, tex: 1.3, real: '#c9a074' }), hull: 1, thr: 50, ...light },
@@ -252,8 +257,8 @@ export async function build(labels, dims) {
     P.add('rafter', bx(XI, YL, -ZI, XE, Y1, ZI), bx(XI, FL, DW, XE, YL, DW + 0.12), bx(XI, FL, -DW - 0.12, XE, YL, -DW));
     P.add('steel', bx(XI - 0.012, YL - 0.1, DW - 0.01, XI, YL + 0.12, DW + 0.13), bx(XI - 0.012, YL - 0.1, -DW - 0.13, XI, YL + 0.12, -DW + 0.01));
 
-    // the chimney block: board-marked concrete with a fire chamber in its east face, a bench in front
-    P.add('concrete', bx(BX0, F, -ZI, 0.5, Y1, BZ),
+    // the chimney block: white painted brick with a fire chamber in its east face, a bench in front
+    P.add('brick', bx(BX0, F, -ZI, 0.5, Y1, BZ),
       bx(0.5, F, -ZI, BX1, F + 0.5, BZ), bx(0.5, F + 1.05, -ZI, BX1, Y1, BZ),
       bx(0.5, F + 0.5, -ZI, BX1, F + 1.05, -2.7), bx(0.5, F + 0.5, -1.5, BX1, F + 1.05, BZ),
       bx(BX1, F, -ZI, 1.3, F + 0.4, BZ));
@@ -268,9 +273,6 @@ export async function build(labels, dims) {
     });
     P.add('cushion', rb(0.84, F + 0.4, -3.36, 1.26, F + 0.47, -2.2, 0.03));
     for (const [y, z] of [[0.045, -1.36], [0.045, -1.26], [0.045, -1.16], [0.125, -1.31], [0.125, -1.21], [0.205, -1.26]]) P.add('oak', lying(0.045, 0.4, 1.05, F + 0.4 + y, z, 'x'));
-    // board marks on the block
-    for (let y = F + 1.6; y < Y1 - 0.2; y += 0.55) joints.push([BX1 + 0.002, y, -ZI, BX1 + 0.002, y, BZ], [BX0 - 0.002, y, -2.82, BX0 - 0.002, y, BZ]);
-    for (const y of [F + 1.05]) joints.push([BX0 - 0.002, y, -2.82, BX0 - 0.002, y, BZ]);
 
     // kitchen: a tall wall of fronts under the landing, a base run along the north wall, the island
     P.add('steel', bx(XW + TH, F, -ZI, -4.28, F + 0.08, -1.44), bx(-4.24, F, -ZI, BX0, F + 0.08, -2.88), bx(-3.06, F, -1.71, -1.14, F + 0.08, -0.89));
@@ -442,7 +444,7 @@ export async function build(labels, dims) {
 
   // =====================================================================================================
   // 05 Cladding: vertical charred larch boards, one band per storey, pulled out from each wall
-  const L5 = layer('cladding', '05', 'Fassade', 'Kohlelärche senkrecht, 22 × 140', null);
+  const L5 = layer('cladding', '05', 'Fassade', 'Eiche geölt senkrecht, 22 × 140', null);
   const cS1 = L5.side(V(0, 0, 1), 2), cN1 = L5.side(V(0, 0, -1), 2), cW1 = L5.side(V(-1, 0, 0), 2);
   const cS2 = L5.side(V(0, 0, 1), 3), cN2 = L5.side(V(0, 0, -1), 3), cW2 = L5.side(V(-1, 0, 0), 3), cE2 = L5.side(V(1, 0, 0), 3);
   const BW = 0.14, BG = 0.026, C0 = FL - 0.25, CM = Y1 + 0.1, CT = YP + PL - 0.06, D0 = 0.03, D1 = 0.052;
@@ -600,11 +602,11 @@ export async function build(labels, dims) {
 
   const STOPS = [
     { id: 'terrace', a: 0.53, b: 0.655, lv: 'PHASE 00 // MONTAGE ABGESCHLOSSEN', t: 'HÜLLE DICHT · TAG ELF', m: 'Sieben Schichten  ·  zwei Krantage  ·  kein Nassbau' },
-    { id: 'living', a: 0.665, b: 0.74, lv: 'STATION 01 // OSTEINGANG · +0.33M', t: 'WOHNEN AM KAMIN', m: 'Glasschiebetür 3,40 m  ·  Kaminblock in Sichtbeton  ·  Ecksofa' },
+    { id: 'living', a: 0.665, b: 0.74, lv: 'STATION 01 // OSTEINGANG · +0.33M', t: 'WOHNEN AM KAMIN', m: 'Glasschiebetür 3,40 m  ·  Kaminblock in weißem Ziegel  ·  Ecksofa' },
     { id: 'kitchen', a: 0.745, b: 0.805, lv: 'STATION 02 // KÜCHE & ESSEN · +0.33M', t: 'KÜCHE & KOCHINSEL', m: 'Steinplatte  ·  Esstisch für sechs  ·  zwei Glaskugeln' },
-    { id: 'stair', a: 0.815, b: 0.89, lv: 'STATION 03 // TREPPE · 15 STEIGUNGEN', t: 'DIE HARFENTREPPE', m: 'Faltwerk aus Räuchereiche  ·  Stahlstäbe bis zur Decke' },
+    { id: 'stair', a: 0.815, b: 0.89, lv: 'STATION 03 // TREPPE · 15 STEIGUNGEN', t: 'DIE HARFENTREPPE', m: 'Faltwerk aus geölter Eiche  ·  Stahlstäbe bis zur Decke' },
     { id: 'studio', a: 0.90, b: 0.955, lv: 'STATION 04 // OBERGESCHOSS · +3.13M', t: 'DAS DACHSTUDIO', m: 'Kniestock 1,40 m  ·  Bücherwand  ·  Arbeitsplatz am Bandfenster' },
-    { id: 'ridge', a: 0.965, b: 1.01, lv: 'STATION 05 // UNTER DEM FIRST · 128 M²', t: 'DER GIEBELRAUM', m: '10,0 × 7,2 m  ·  First +7,90 m  ·  BSP, Kohlelärche & Zink' },
+    { id: 'ridge', a: 0.965, b: 1.01, lv: 'STATION 05 // UNTER DEM FIRST · 128 M²', t: 'DER GIEBELRAUM', m: '10,0 × 7,2 m  ·  First +7,90 m  ·  BSP, Eiche & Zink' },
   ];
 
   // the radar shows the floor the camera is on
@@ -759,7 +761,7 @@ export async function build(labels, dims) {
       loader: 'Plotte Blatt A-04',
       h1: 'Zwei Geschosse.<br>Sieben <em>Schichten.</em>',
       lede: 'Sieben Schichten, in unserer Werkstatt vorgefertigt und in elf Tagen auf der Baustelle geschlossen. Scrollen Sie, um das Haus zusammenzusetzen, und gehen Sie dann durch die große Glastür hinein und die Treppe hinauf bis unter den First.',
-      spec: [['Haus', 'Haus Karbon'], ['Fläche', '128 m² · zwei Ebenen'], ['Hülle', 'BSP, Kohlelärche, Zink']],
+      spec: [['Haus', 'Haus Karbon'], ['Fläche', '128 m² · zwei Ebenen'], ['Hülle', 'BSP, Eiche geölt, Zink']],
       hint: 'Zum Aufbauen scrollen',
     },
   };

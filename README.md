@@ -7,12 +7,12 @@ Eine Explosionsaxonometrie eines zweigeschossigen Hauses, mit weißer Tusche auf
 Drei Varianten mit demselben Code:
 
 - `?dir=a` Das Planblatt: Haus Karbon, zwei Geschosse unter einem Satteldach (die Hauptdemo)
-- `?dir=b` Die Abwicklung: die Wandansichten einer Küche falten sich zu einem Raum, in den Sie hineingehen
+- `?dir=b` Die Abwicklung: die Wandansichten eines Wohn- und Arbeitszimmers falten sich zu einem Raum, in den Sie hineingehen
 - `?dir=c` Geschossweise: ein fünfgeschossiger Holzbau stapelt sich um seinen Kern
 
 ## Das Haus in Variante A
 
-10,0 × 7,2 m, zwei Ebenen, 128 m². Unten ein offener Raum: Wohnen am Kaminblock aus Sichtbeton, Küche mit Kochinsel, Esstisch für sechs. Die Ostseite ist eine Glasfront mit zwei roten Schiebeflügeln, zusammen 3,40 m breit. An der Westwand führt eine Faltwerktreppe mit Stahlstäben ins Dachstudio: Bücherwand unter der Traufe, Arbeitsplatz am Bandfenster, das Bett unter dem Giebelfenster.
+10,0 × 7,2 m, zwei Ebenen, 128 m². Unten ein offener Raum: Wohnen am Kaminblock aus weiß gestrichenem Ziegel, Küche mit Kochinsel, Esstisch für sechs. Die Ostseite ist eine Glasfront mit zwei roten Schiebeflügeln, zusammen 3,40 m breit. An der Westwand führt eine Faltwerktreppe mit Stahlstäben ins Dachstudio: Bücherwand unter der Traufe, Arbeitsplatz am Bandfenster, das Bett unter dem Giebelfenster.
 
 Sieben Schichten: Boden, Erdgeschoss, Obergeschoss, Verglasung, Fassade, Dachtragwerk, Dach.
 
@@ -27,9 +27,11 @@ Sieben Schichten: Boden, Erdgeschoss, Obergeschoss, Verglasung, Fassade, Dachtra
 
 ## Farbe, Autoplay und Übergänge
 
-- **Die Farbe kommt an der Haustür.** Sobald die Kamera an der Tür steht, füllt sich das Bild in etwa 3,5 Sekunden mit Farbe: ein klarer blauer Himmel mit Wolken über den ganzen Bildschirm, helle Fassaden, helle Eiche, Salbeigrün und türkisfarbenes Glas, bewusst als Illustration und nicht als Rendering. In Variante A breitet sie sich vom Kamin aus, in B fällt sie durchs Ostfenster herein, in C steigt sie von der Straße auf. Eine schmale Front in Gletscher-Cyan führt sie an (`LIVE` in `core.js`).
-- **Am Ende geht es zurück vor das Haus.** Nach dem letzten Raum schwenkt die Kamera in einer Drehung hinaus vor die Fassade, und die Farbe zieht sich dabei zurück: in A vom First zum Boden, in B zurück durchs Fenster, in C in weichen Flecken von oben.
-- **Die Varianten laufen nacheinander.** Jede Variante spielt sich von selbst ab und verweilt an jeder Station. Am Ende zeichnet sich das Blatt zurück, ein Übergang schließt das Bild, und die nächste Variante beginnt: A, B, C und wieder A. Jede Variante hat ihren eigenen Übergang hinein und hinaus. Eigenes Scrollen übernimmt, die Taste `P` oder der Knopf unten links gibt die Steuerung zurück.
+- **Die Farbe kommt an der Haustür.** Sobald die Kamera an der Tür steht, füllt sich das Bild in etwa 3,5 Sekunden mit Farbe: ein klarer blauer Himmel mit Wolken über den ganzen Bildschirm, helle Fassaden, helle Eiche, Salbeigrün und türkisfarbenes Glas, bewusst als Illustration und nicht als Rendering. In Variante A breitet sie sich vom Kamin aus, in B fällt sie durchs Fenster herein, in C steigt sie von der Straße auf. Eine schmale Front in Gletscher-Cyan führt sie an (`LIVE` in `core.js`).
+- **Am Ende geht es zurück vor das Haus.** Nach dem letzten Raum schwenkt die Kamera in einer Drehung hinaus vor die Fassade, und die Farbe zieht sich dabei zurück: in A vom First zum Boden, in B öffnet sich das Zimmer dabei zum Schnittmodell, wie ein Puppenhaus, und die Farbe geht zurück durchs Fenster, in C in weichen Flecken von oben.
+- **Die Varianten laufen nacheinander.** Jede Variante spielt sich von selbst ab und verweilt an jeder Station. Am Ende zeichnet sich das Blatt zurück, ein Übergang schließt das Bild, und die nächste Variante beginnt: A, B, C und wieder A. Jede Variante hat ihren eigenen Übergang hinein und hinaus. Eigenes Scrollen übernimmt, die Taste `P` oder der Knopf unten links gibt die Steuerung zurück. Nach Variante C geht die Schau mit Demo 2 weiter, und so durch alle sieben Demos (siehe [threejs-demos](https://github.com/seofessionals-3js/threejs-demos)).
+- **Variante B als helles Wohn- und Arbeitszimmer.** 4,8 × 4,8 m, 3,00 m hoch: eine weiß gestrichene Ziegelwand mit Schreibtisch, Stuhl, Eichenregal und Bildern, gegenüber das Holzfenster mit Rollo, Sofa, Plattenspieler und Pflanzen, in der Mitte ein Eichen-Couchtisch auf einem Teppich mit schwarzem Rautenmuster, darunter ein Boden aus schmalem Eichenparkett. In Farbe steht das Zimmer vor einem hellgrauen Studiohintergrund. Am Ende senken sich die beiden vorderen Wände, die Decke gleitet weg, und Sie sehen das Zimmer von schräg oben.
+- **Variante A in Eiche.** In Farbe ist das Haus aus geölter Eiche wie ein warmer Dielenboden: Eichendielen auf beiden Böden, helle Eiche an Decken und Dachuntersicht, senkrechte Eichenbretter an der Fassade. Dazu weiß gestrichener Ziegel am Kaminblock, weißer Putz, weiße Küchenfronten und ein cremefarbener Teppich mit schwarzem Rautenmuster. Die Oberflächen werden beim Laden auf Canvas gemalt (`tex-a.js`) und in Metern auf die Flächen gelegt (`realMap` in `toneMat`).
 
 ## Dachaufbau in Variante A
 
@@ -52,7 +54,7 @@ Schwarz, Weiß und Rot, in allen drei Varianten.
 | | Farbe | Verwendung |
 |---|---|---|
 | Blatt | `#0c0c0e` | Hintergrund, Papier |
-| Flächen | `#161618` bis `#6a645d` | Kohlelärche, Zink, Wände, Räuchereiche, Beton, Sparren |
+| Flächen | `#161618` bis `#6a645d` | Fassade, Zink, Wände, Eiche, Beton, Sparren |
 | Tusche | `#f1eeea` | Linien, Schrift |
 | Weiß | `#e7e4df` | Polster, Steinplatten, Leuchten |
 | Rot | `#e5202e` | Stift, landende Schicht, Türrahmen, Akzente |
@@ -62,7 +64,7 @@ Die Varianten B und C sind beleuchtete Szenen. Dort stellt eine Farbkorrektur im
 
 ## Dateien
 
-`index.html`, `sketch.css`, `main.js` (Loader, Scrollen, Radar), `core.js` (Renderer, Plotter, Materialien, Kamera), `dir-a.js`, `dir-b.js`, `dir-c.js` (eine Datei pro Variante). Etwa 118 KB für die Hauptdemo.
+`index.html`, `sketch.css`, `main.js` (Loader, Scrollen, Radar), `core.js` (Renderer, Plotter, Materialien, Kamera), `dir-a.js`, `dir-b.js`, `dir-c.js` (eine Datei pro Variante), `tex-a.js` (Eiche, Ziegel und Teppich für Variante A). Etwa 118 KB für die Hauptdemo.
 
 `?p=0.6` friert den Scrollfortschritt bei 60 % ein.
 

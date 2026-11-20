@@ -11,6 +11,9 @@
   --accent: #e5202e;
   --accent-hi: #ff4d57;
   --accent-deep: #8c111b;
+  /* glacier cyan: dimensions, the colour front, autoplay */
+  --accent2: #43c4d2;
+  --accent2-soft: rgba(67, 196, 210, 0.16);
   --mono: 'IBM Plex Mono', ui-monospace, monospace;
   --display: 'Chakra Petch', sans-serif;
   --sans: 'Chakra Petch', sans-serif;
@@ -353,6 +356,71 @@ body.phone .lab .nm-s { display: inline; }
 body.phone .lab.on .nm-s { color: #fff; }
 
 .bottom span { transition: none; }
+
+/* autoplay */
+.bottom .bl { display: inline-flex; align-items: center; gap: 8px; }
+#ui .play { pointer-events: auto; }
+.play {
+  display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+  font: 600 10px var(--mono); letter-spacing: .14em; text-transform: uppercase;
+  background: rgba(12, 12, 14, 0.94); color: var(--ink);
+  border: 1px solid var(--accent2); padding: 6px 12px 6px 10px;
+  transition: background .15s, color .15s;
+}
+.play:hover { background: var(--accent2-soft); }
+.play:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+.play i { width: 0; height: 0; border-style: solid; border-width: 5px 0 5px 8px; border-color: transparent transparent transparent var(--accent2); }
+.play.on i { width: 8px; height: 10px; border: none; border-left: 3px solid var(--accent2); border-right: 3px solid var(--accent2); }
+body.phone .play { padding: 4px 8px; font-size: 9px; }
+body.phone .play span { display: none; }
+
+/* progress of the sheet under its tab */
+.dir-switch a { position: relative; }
+.dir-switch a.active::after {
+  content: ''; position: absolute; left: 0; bottom: -1.5px; height: 2px;
+  width: calc(var(--prog, 0) * 100%); background: var(--accent2);
+}
+
+/* dimensions in the drawing */
+#dims { position: fixed; inset: 0; pointer-events: none; z-index: 3; }
+.dim {
+  position: absolute; left: 0; top: 0; white-space: nowrap; transform-origin: 0 0;
+  font: 600 10px/1.15 var(--mono); letter-spacing: .08em; text-transform: uppercase;
+  color: var(--accent2); opacity: 0; will-change: transform, opacity;
+  text-shadow: 0 0 3px #0c0c0e, 0 0 6px #0c0c0e, 0 0 1px #0c0c0e;
+}
+.dim b { font-weight: 600; background: rgba(12, 12, 14, 0.8); padding: 1px 4px; }
+.dim span { display: block; width: max-content; margin: 1px auto 0; font-size: 8.5px; font-weight: 500; letter-spacing: .1em; color: rgba(241, 238, 234, 0.86); background: rgba(12, 12, 14, 0.72); padding: 0 4px; }
+body.phone .dim { font-size: 8.5px; }
+body.phone .dim span { display: none; }
+.dimpanel {
+  position: absolute; left: 30px; bottom: 118px; width: 330px; opacity: 0;
+  background: rgba(12, 12, 14, 0.92); border: 1px solid rgba(67, 196, 210, 0.45); border-left: 3px solid var(--accent2);
+  padding: 9px 12px 9px 11px; font: 500 9.5px/1.45 var(--mono); letter-spacing: .07em; text-transform: uppercase; color: var(--ink);
+}
+.dimpanel .dp-h { font-weight: 600; letter-spacing: .14em; color: var(--accent2); margin-bottom: 6px; display: flex; gap: 8px; align-items: center; }
+.dimpanel .dp-h i { font-style: normal; color: var(--paper); background: var(--accent2); padding: 0 5px; }
+.dimpanel table { border-collapse: collapse; width: 100%; }
+.dimpanel td { padding: 2px 0; border-top: 1px solid rgba(241, 238, 234, 0.1); vertical-align: top; }
+.dimpanel td:first-child { width: 44px; color: var(--accent2); font-weight: 600; text-align: right; padding-right: 10px; }
+.dimpanel .dp-f { margin-top: 6px; padding-top: 5px; border-top: 1px solid rgba(67, 196, 210, 0.3); color: var(--mute); }
+#leaders .dimlead polyline { stroke: var(--accent2); stroke-width: 1; fill: none; }
+#leaders .dimlead polyline.halo { stroke: var(--paper); stroke-width: 4; opacity: .9; }
+#leaders .dimlead circle { fill: var(--accent2); }
+#leaders .dimlead circle.halo { fill: var(--paper); }
+
+/* the hand-over card between two sheets */
+#xfer {
+  position: fixed; inset: 0; z-index: 11; pointer-events: none; opacity: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  background: #050506; color: var(--ink); text-transform: uppercase;
+}
+html.chain #xfer { opacity: 1; }
+html.chain #fade { display: none; }
+#xfer .xk { font: 500 10px var(--mono); letter-spacing: .24em; color: var(--mute); }
+#xfer .xn { font: 600 15px var(--mono); letter-spacing: .3em; color: var(--accent2); padding: 3px 10px; border: 1px solid var(--accent2); }
+#xfer .xt { font: 600 clamp(36px, 5vw, 64px)/1 var(--display); letter-spacing: .02em; }
+
 #legend { display: none; }
 body.phone #legend {
   display: block; position: absolute; left: 16px; right: 16px; bottom: 46px;

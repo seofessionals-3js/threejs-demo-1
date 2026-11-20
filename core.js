@@ -16,11 +16,12 @@ export const easeOut = t => 1 - Math.pow(1 - t, 3);
 export const win = (p, a, b) => clamp((p - a) / (b - a));
 export const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
-// The sheet is black, the ink is white and the pen is red.
+// The sheet is black, the ink is white and the pen is red. Glacier cyan measures, and leads the colour.
 export const INK = '#f1eeea';
 export const PAPER = '#0c0c0e';
 export const ACCENT = '#e5202e';
 export const ACCENT_HI = '#ff4d57';
+export const ACCENT2 = '#43c4d2';
 
 export const ctx = { W: innerWidth, H: innerHeight, res: new THREE.Vector2(innerWidth, innerHeight), lineMats: new Set(), shadows: false, phone: innerWidth < 700 };
 
@@ -37,33 +38,114 @@ const DRAW_GLSL = `uniform float uDraw; uniform float uDrawFill; uniform float u
   float drawOrder(vec3 w) { return dot(w, uDrawDir.xyz) + uDrawDir.w * length(w.xz - uDrawC.xz); }
 `;
 const addDraw = (sh) => { Object.assign(sh.uniforms, DRAW); };
+
+// ---------- the colour. Every material keeps its drawn tone and knows its real one. A front (planar, radial or
+// both, with a little noise so it reads like paint soaking into paper) carries the real colours in, a second
+// front carries them out again. The thin band at each front glows in glacier cyan.
+export const LIVE = {
+  uInF: { value: -1e5 }, uOutF: { value: -1e5 },
+  uInDir: { value: new THREE.Vector4(0, 0, 0, 1) }, uInC: { value: new THREE.Vector3() },
+  uOutDir: { value: new THREE.Vector4(0, -1, 0, 0) }, uOutC: { value: new THREE.Vector3() },
+  uLiveSoft: { value: 2.5 }, uInN: { value: 2 }, uOutN: { value: 2 },
+  uLive: { value: 0 },          // how much colour there is overall: sky light, motes, lamps
+  uTime: { value: 0 },
+  uEdge: { value: new THREE.Color(ACCENT2) },
+  uSunDir: { value: new THREE.Vector3(-0.5, 0.55, 0.65).normalize() },
+  uSunCol: { value: new THREE.Color('#fff1da') }, uSkyCol: { value: new THREE.Color('#eaf2fb') }, uBounce: { value: new THREE.Color('#f1e5d1') },
+  uRoom: { value: new THREE.Vector4(0, 0, 0, 0) }, uRoomY: { value: new THREE.Vector4(0, 0, 0, 0) },
+  uFoot: { value: new THREE.Vector4(0, 0, 0, 0) }, uFoot2: { value: new THREE.Vector2(0, 1.5) },
+  uGrass: { value: new THREE.Color('#c3d3a2') }, uGrass2: { value: new THREE.Color('#9db682') },
+};
+const addLive = (sh) => { Object.assign(sh.uniforms, LIVE); };
+const LIVE_GLSL = `uniform float uInF; uniform float uOutF; uniform vec4 uInDir; uniform vec3 uInC; uniform vec4 uOutDir; uniform vec3 uOutC;
+  uniform float uLiveSoft; uniform float uInN; uniform float uOutN; uniform float uLive; uniform float uTime; uniform vec3 uEdge;
+  uniform vec3 uSunDir; uniform vec3 uSunCol; uniform vec3 uSkyCol; uniform vec3 uBounce; uniform vec4 uRoom; uniform vec4 uRoomY;
+  uniform vec4 uFoot; uniform vec2 uFoot2; uniform vec3 uGrass; uniform vec3 uGrass2;
+  float lvH(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+  float lvN(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(mix(lvH(i), lvH(i + vec3(1, 0, 0)), f.x), mix(lvH(i + vec3(0, 1, 0)), lvH(i + vec3(1, 1, 0)), f.x), f.y),
+               mix(mix(lvH(i + vec3(0, 0, 1)), lvH(i + vec3(1, 0, 1)), f.x), mix(lvH(i + vec3(0, 1, 1)), lvH(i + vec3(1, 1, 1)), f.x), f.y), f.z); }
+  // x: how much real colour, y: the glow of a passing front
+  vec2 liveAt(vec3 w) {
+    if (uInF < -9e4) return vec2(0.0);
+    float n = lvN(w * 0.45) * 0.65 + lvN(w * 1.7 + 3.1) * 0.35 - 0.5;
+    float oi = dot(w, uInDir.xyz) + uInDir.w * length(w - uInC) + n * uInN;
+    float oo = dot(w, uOutDir.xyz) + uOutDir.w * length(w - uOutC) + n * uOutN;
+    float a = 1.0 - smoothstep(uInF - uLiveSoft, uInF, oi);
+    float b = smoothstep(uOutF - uLiveSoft, uOutF, oo);
+    float ea = smoothstep(0.0, 0.5, a) * (1.0 - smoothstep(0.5, 1.0, a));
+    float eb = smoothstep(0.0, 0.5, b) * (1.0 - smoothstep(0.5, 1.0, b));
+    return vec2(a * b, ea * b + eb * a);
+  }
+  vec3 swayOff(vec3 w, float amp) {
+    return amp * (0.45 + 0.55 * uLive) * vec3(sin(uTime * 1.7 + w.x * 2.1 + w.z * 1.3 + w.y * 0.9), 0.0, cos(uTime * 1.3 + w.z * 2.3 + w.x * 0.7 + w.y * 1.1));
+  }
+  // the ground in colour: a meadow with a soft shadow of the building thrown away from the sun
+  vec3 groundCol(vec2 xz, float ink) {
+    float n = lvN(vec3(xz * 0.16, 0.0)) * 0.55 + lvN(vec3(xz * 0.8, 2.0)) * 0.3 + lvN(vec3(xz * 3.6, 5.0)) * 0.15;
+    vec3 g = mix(uGrass2, uGrass, n);
+    vec3 sd = normalize(uSunDir);
+    vec3 L = vec3(1.0);
+    float sh = 1.0;
+    if (uFoot.z > uFoot.x) {
+      vec2 off = -sd.xz / max(sd.y, 0.3) * uFoot2.x;
+      vec2 c = (uFoot.xy + uFoot.zw) * 0.5 + off * 0.5, hs = (uFoot.zw - uFoot.xy) * 0.5 + abs(off) * 0.5;
+      vec2 q = abs(xz - c) - hs; float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
+      sh = 1.0 - 0.28 * (1.0 - smoothstep(-0.6, uFoot2.y, d));
+    }
+    vec3 col = g * L * mix(vec3(0.82, 0.8, 0.92), vec3(1.0), sh);
+    return mix(col, vec3(1.0), ink * 0.35);
+  }
+`;
 function patchFill(m, o = {}) {
   const prev = m.onBeforeCompile;
   const grainAmt = o.grain ?? 0.022;
+  const real = new THREE.Color(o.real ?? (m.map ? '#ffffff' : m.color));
+  if (o.island) { m.transparent = true; m.depthWrite = false; }
+  const base = m.color.clone();
+  m.userData.real = real;
   m.onBeforeCompile = (sh, r) => {
     if (prev) prev(sh, r);
-    addDraw(sh);
+    addDraw(sh); addLive(sh);
     sh.uniforms.uGrain = { value: grainAmt };
-    sh.vertexShader = 'varying vec3 vWD; varying vec3 vLP;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n vWD = (modelMatrix * vec4(transformed, 1.0)).xyz;\n vLP = transformed;');
-    sh.fragmentShader = DRAW_GLSL + 'uniform float uGrain; varying vec3 vLP;\nfloat hash3(vec3 p){ p = fract(p * vec3(443.897, 441.423, 437.195)); p += dot(p, p.yzx + 19.19); return fract((p.x + p.y) * p.z); }\n' + sh.fragmentShader
-      .replace('#include <clipping_planes_fragment>', 'if (drawOrder(vWD) > uDrawFill) discard;\n#include <clipping_planes_fragment>')
-      .replace('#include <map_fragment>', (o.wash === false ? '#include <map_fragment>' : '#include <map_fragment>\n diffuseColor.rgb = mix(diffuseColor.rgb, mix(mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))), 0.5), vec3(0.115, 0.115, 0.125), 0.4), uWash);')
-        + '\n diffuseColor.rgb *= 1.0 + (hash3(floor(vLP * 140.0)) - 0.5) * uGrain * (1.0 - 0.5 * uWash);');
-    // the night grade: everything settles into neutral greys, and only warm saturated colours survive, as the brand red
-    if (o.grade !== false) sh.fragmentShader = sh.fragmentShader.replace('#include <tonemapping_fragment>', `{ vec3 gc = gl_FragColor.rgb; float gm = max(gc.r, max(gc.g, gc.b));
+    sh.uniforms.uReal = { value: real }; sh.uniforms.uBase = { value: base }; sh.uniforms.uSway = { value: o.sway ?? 0 };
+    sh.uniforms.uIsland = { value: new THREE.Vector4(...(o.island || [0, 0, 1, 1])) }; sh.uniforms.uIslandMode = { value: o.island?.[4] ?? -1 };
+    sh.vertexShader = LIVE_GLSL + 'uniform float uSway; varying vec3 vWD; varying vec3 vLP;\n' + sh.vertexShader
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\n if (uSway > 0.0) transformed += swayOff((modelMatrix * vec4(transformed, 1.0)).xyz, uSway);')
+      .replace('#include <project_vertex>', '#include <project_vertex>\n vWD = (modelMatrix * vec4(transformed, 1.0)).xyz;\n vLP = transformed;');
+    const realCode = o.ground
+      ? 'vec3 rc = groundCol(vWD.xz, clamp(dot(texel, vec3(0.333)) * 1.6 - 0.1, 0.0, 1.0));'
+      : 'vec3 rc = texel * uReal;';
+    sh.fragmentShader = DRAW_GLSL + LIVE_GLSL + 'uniform float uGrain; uniform vec3 uReal; uniform vec3 uBase; uniform vec4 uIsland; uniform float uIslandMode; varying vec3 vLP; vec2 gLive;\nfloat hash3(vec3 p){ p = fract(p * vec3(443.897, 441.423, 437.195)); p += dot(p, p.yzx + 19.19); return fract((p.x + p.y) * p.z); }\n' + sh.fragmentShader
+      .replace('#include <clipping_planes_fragment>', 'if (drawOrder(vWD) > uDrawFill) discard;\n gLive = liveAt(vWD);\n#include <clipping_planes_fragment>')
+      .replace('#include <map_fragment>', '#include <map_fragment>\n { vec3 texel = diffuseColor.rgb / max(uBase, vec3(1e-3)); ' + realCode + ' diffuseColor.rgb = mix(diffuseColor.rgb, rc, gLive.x); }'
+        + (o.wash === false ? '' : '\n diffuseColor.rgb = mix(diffuseColor.rgb, mix(mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))), 0.5), vec3(0.115, 0.115, 0.125), 0.4), uWash);')
+        + '\n diffuseColor.rgb *= 1.0 + (hash3(floor(vLP * 140.0)) - 0.5) * uGrain * (1.0 - 0.5 * uWash) * (1.0 - 0.6 * gLive.x);');
+    // the night grade: everything settles into neutral greys, and only warm saturated colours survive, as the brand red.
+    // Where the colour has arrived the grade lets go.
+    const grade = o.grade === false ? '' : `{ vec3 gc = gl_FragColor.rgb; float gm = max(gc.r, max(gc.g, gc.b));
         float gl = dot(gc, vec3(0.2126, 0.7152, 0.0722));
         float gr = smoothstep(0.56, 0.72, (gc.r - max(gc.g, gc.b)) / max(gm, 1e-4));
-        gl_FragColor.rgb = mix(vec3(gl) * vec3(1.0, 0.995, 1.03), vec3(0.78, 0.016, 0.03) * clamp(gl * 4.6, 0.0, 1.35), gr); }
-      #include <tonemapping_fragment>`);
+        gl_FragColor.rgb = mix(mix(vec3(gl) * vec3(1.0, 0.995, 1.03), vec3(0.78, 0.016, 0.03) * clamp(gl * 4.6, 0.0, 1.35), gr), mix(gc * 1.12, diffuseColor.rgb * 0.95, 0.5), gLive.x); }`;
+    const island = 'if (uIslandMode > -0.5) { float fd = 1.0 - smoothstep(0.5, 1.0, length((vWD.xz - uIsland.xy) / uIsland.zw)); gl_FragColor.a *= uIslandMode > 0.5 ? gLive.x * fd : mix(1.0, fd, gLive.x); }';
+    sh.fragmentShader = sh.fragmentShader.replace('#include <tonemapping_fragment>', grade + '\n gl_FragColor.rgb += uEdge * gLive.y * 0.28;\n' + island + '\n #include <tonemapping_fragment>');
   };
   return m;
 }
-function patchLine(m) {
+function patchLine(m, o = {}) {
+  m.userData.liveK = o.live === false ? 0 : 1;
   m.onBeforeCompile = (sh) => {
-    addDraw(sh);
-    sh.vertexShader = sh.vertexShader.replace('void main() {', 'varying vec3 vWD;\nvoid main() {\n vWD = (modelMatrix * vec4((position.y < 0.5) ? instanceStart : instanceEnd, 1.0)).xyz;');
-    sh.fragmentShader = DRAW_GLSL + sh.fragmentShader.replace('#include <color_fragment>', `{ float k = uDraw - drawOrder(vWD); if (k < 0.0) discard;
+    addDraw(sh); addLive(sh);
+    sh.uniforms.uLiveK = { value: m.userData.liveK }; sh.uniforms.uSway = { value: o.sway ?? 0 };
+    let vs = LIVE_GLSL + 'uniform float uSway;\n' + sh.vertexShader.replace('void main() {', 'varying vec3 vWD;\nvoid main() {\n vWD = (modelMatrix * vec4((position.y < 0.5) ? instanceStart : instanceEnd, 1.0)).xyz;');
+    if (o.sway) vs = vs
+      .replace('vec4 start = modelViewMatrix * vec4( instanceStart, 1.0 );', 'vec4 start = modelViewMatrix * vec4( instanceStart + swayOff((modelMatrix * vec4(instanceStart, 1.0)).xyz, uSway), 1.0 );')
+      .replace('vec4 end = modelViewMatrix * vec4( instanceEnd, 1.0 );', 'vec4 end = modelViewMatrix * vec4( instanceEnd + swayOff((modelMatrix * vec4(instanceEnd, 1.0)).xyz, uSway), 1.0 );');
+    sh.vertexShader = vs;
+    // in colour the ink steps back to a fine dark line, as on a coloured presentation drawing
+    sh.fragmentShader = DRAW_GLSL + LIVE_GLSL + 'uniform float uLiveK;\n' + sh.fragmentShader.replace('#include <color_fragment>', `{ float k = uDraw - drawOrder(vWD); if (k < 0.0) discard;
         diffuseColor.rgb = mix(uPen, diffuseColor.rgb, smoothstep(0.0, uDrawSoft, k)); }
+      if (uLiveK > 0.0) { vec2 lv = liveAt(vWD) * uLiveK; diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.32, 0.29, 0.26), lv.x) + uEdge * lv.y * 0.6; alpha *= 1.0 - 0.6 * lv.x; }
       #include <color_fragment>`);
   };
   return m;
@@ -147,10 +229,12 @@ export function lineMat(o = {}) {
   });
   m.userData.w = o.w ?? 1; m.resolution.copy(ctx.res); ctx.lineMats.add(m);
   if (ctx.phone) m.linewidth = m.userData.w * 0.72;
-  return patchLine(m);
+  return patchLine(m, o);
 }
 // The drawing's own shading: directional sun + cool sky fill + procedural local-space architectural texture
 // mode: 0 = paper/plaster, 1 = timber/oak/glulam, 2 = cast concrete, 3 = standing-seam zinc, 4 = woven textile, 5 = glass
+// o.real: the colour it has in the world; o.realMode / o.realTex: the surface it shows then; o.realGlow: light it
+// gives off in colour (lamp shades, embers); o.realOp: glass gets a touch more body; o.sway: leaves move in the air
 export function toneMat(hex, o = {}) {
   const op = o.opacity ?? 1;
   const mode = o.mode ?? 0;
@@ -163,21 +247,74 @@ export function toneMat(hex, o = {}) {
       uScale: { value: sc },
       uTex: { value: o.tex ?? 2.4 },
       uGlow: { value: new THREE.Color(o.glow ?? '#000000') },
-      ...DRAW,
+      uReal: { value: new THREE.Color(o.real ?? hex) },
+      uRealMode: { value: o.realMode ?? mode },
+      uRealTex: { value: o.realTex ?? 2.2 },
+      uRealGlow: { value: new THREE.Color(o.realGlow ?? '#000000') },
+      uOpR: { value: o.realOp ?? op },
+      uSway: { value: o.sway ?? 0 },
+      ...DRAW, ...LIVE,
     },
-    vertexShader: `varying vec3 vN; varying vec3 vWD; varying vec3 vLP;
+    vertexShader: LIVE_GLSL + `uniform float uSway; varying vec3 vN; varying vec3 vWD; varying vec3 vLP;
       void main(){
         vN = normalize(mat3(modelMatrix) * normal);
         vLP = position;
-        vWD = (modelMatrix * vec4(position, 1.0)).xyz;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        vec3 pos = position;
+        if (uSway > 0.0) pos += swayOff((modelMatrix * vec4(position, 1.0)).xyz, uSway);
+        vWD = (modelMatrix * vec4(pos, 1.0)).xyz;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
       }`,
-    fragmentShader: DRAW_GLSL + `uniform vec3 uCol; uniform float uOp; uniform float uMode; uniform float uScale; uniform float uTex; uniform vec3 uGlow;
+    fragmentShader: DRAW_GLSL + LIVE_GLSL + `uniform vec3 uCol; uniform float uOp; uniform float uMode; uniform float uScale; uniform float uTex; uniform vec3 uGlow;
+      uniform vec3 uReal; uniform float uRealMode; uniform float uRealTex; uniform vec3 uRealGlow; uniform float uOpR;
       varying vec3 vN; varying vec3 vLP;
       float h2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float n2(vec2 p){
         vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
         return mix(mix(h2(i), h2(i + vec2(1,0)), f.x), mix(h2(i + vec2(0,1)), h2(i + vec2(1,1)), f.x), f.y);
+      }
+      float texOf(float mode, vec3 p, vec2 uv, float top) {
+        if (mode > 0.5 && mode < 1.5) {
+          // Mode 1: architectural timber / oak / glulam grain & plank variation
+          float plankId = floor(uv.y * 5.0);
+          float plankTone = (h2(vec2(plankId, floor(uv.x * 0.4))) - 0.5) * 0.045;
+          float wave = sin(uv.x * 3.5 + n2(uv * 2.2) * 4.5);
+          float grain = (n2(vec2(uv.x * 4.0, uv.y * 38.0 + wave * 1.8)) - 0.5) * 0.042;
+          float seam = smoothstep(0.035, 0.0, fract(uv.y * 5.0)) * -0.045;
+          return plankTone + grain + seam;
+        } else if (mode >= 1.5 && mode < 2.5) {
+          // Mode 2: cast concrete with lift lines and mineral aggregate stipple
+          float lift = smoothstep(0.03, 0.0, fract(p.y * 2.5)) * -0.05;
+          float blotch = (n2(uv * 3.2) - 0.5) * 0.045;
+          float stipple = (h2(floor(uv * 65.0)) - 0.5) * 0.048;
+          return lift + blotch + stipple;
+        } else if (mode >= 2.5 && mode < 3.5) {
+          // Mode 3: standing-seam zinc roof panels
+          float pan = sin(uv.x * 14.0) * 0.018;
+          float stria = (n2(vec2(uv.x * 45.0, uv.y * 3.0)) - 0.5) * 0.025;
+          return pan + stria + 0.02 * top;
+        } else if (mode >= 3.5 && mode < 4.5) {
+          // Mode 4: woven textile / upholstery / rug
+          float w1 = sin(uv.x * 90.0) * sin(uv.y * 90.0) * 0.022;
+          float w2 = (n2(uv * 16.0) - 0.5) * 0.03;
+          return w1 + w2;
+        }
+        // Mode 0: warm paper / lime plaster micro-grain
+        return (n2(uv * 5.5) - 0.5) * 0.018 + (h2(floor(uv * 90.0)) - 0.5) * 0.016;
+      }
+      // daylight for the real colours: a warm sun, a cool sky and the bounce off the ground. Under the roof of
+      // the house the sun only comes in through the glass, so the rooms go warm and quiet, lit by their lamps.
+      vec3 dayLight(vec3 n) {
+        // not a physical light: an illustrator's. Everything is bright and soft, the sun side a little warmer
+        // and lifted, the shade side a little cooler, and the rooms a touch warmer still.
+        vec3 sd = normalize(uSunDir);
+        float sunL = max(dot(n, sd), 0.0), hemi = n.y * 0.5 + 0.5;
+        vec3 L = mix(uBounce, uSkyCol, hemi) * 0.84 + uSunCol * sunL * 0.3;
+        if (uRoomY.w > 0.5) {
+          float inside = step(uRoom.x, vWD.x) * step(vWD.x, uRoom.y) * step(uRoom.z, vWD.z) * step(vWD.z, uRoom.w)
+            * step(uRoomY.x, vWD.y) * step(vWD.y, uRoomY.y + (uRoom.w - abs(vWD.z)) * uRoomY.z);
+          L = mix(L, L * 0.93 + vec3(0.07, 0.045, 0.015), inside);
+        }
+        return L;
       }
       void main(){
         if (drawOrder(vWD) > uDrawFill) discard;
@@ -190,43 +327,22 @@ export function toneMat(hex, o = {}) {
         float shade = 0.60 + 0.34 * sun + 0.08 * sky + 0.06 * top;
         vec3 p = vLP * uScale;
         vec2 uv = abs(n.y) > 0.7 ? p.xz : (abs(n.x) > 0.7 ? p.zy : p.xy);
-        float tex = 0.0;
-        if (uMode > 0.5 && uMode < 1.5) {
-          // Mode 1: architectural timber / oak / glulam grain & plank variation
-          float plankId = floor(uv.y * 5.0);
-          float plankTone = (h2(vec2(plankId, floor(uv.x * 0.4))) - 0.5) * 0.045;
-          float wave = sin(uv.x * 3.5 + n2(uv * 2.2) * 4.5);
-          float grain = (n2(vec2(uv.x * 4.0, uv.y * 38.0 + wave * 1.8)) - 0.5) * 0.042;
-          float seam = smoothstep(0.035, 0.0, fract(uv.y * 5.0)) * -0.045;
-          tex = plankTone + grain + seam;
-        } else if (uMode >= 1.5 && uMode < 2.5) {
-          // Mode 2: cast concrete with lift lines and mineral aggregate stipple
-          float lift = smoothstep(0.03, 0.0, fract(p.y * 2.5)) * -0.05;
-          float blotch = (n2(uv * 3.2) - 0.5) * 0.045;
-          float stipple = (h2(floor(uv * 65.0)) - 0.5) * 0.048;
-          tex = lift + blotch + stipple;
-        } else if (uMode >= 2.5 && uMode < 3.5) {
-          // Mode 3: standing-seam zinc roof panels
-          float pan = sin(uv.x * 14.0) * 0.018;
-          float stria = (n2(vec2(uv.x * 45.0, uv.y * 3.0)) - 0.5) * 0.025;
-          tex = pan + stria + 0.02 * top;
-        } else if (uMode >= 3.5 && uMode < 4.5) {
-          // Mode 4: woven textile / upholstery / rug
-          float w1 = sin(uv.x * 90.0) * sin(uv.y * 90.0) * 0.022;
-          float w2 = (n2(uv * 16.0) - 0.5) * 0.03;
-          tex = w1 + w2;
-        } else if (uMode >= 4.5) {
-          // Mode 5: architectural triple glazing with diagonal skylight sheen
+        vec2 lv = liveAt(vWD);
+        if (uMode >= 4.5) {
+          // Mode 5: architectural triple glazing with diagonal skylight sheen; in colour it holds the sky
           float sheen = smoothstep(0.45, 0.55, sin((vLP.x + vLP.y * 1.35 + vLP.z) * 1.8)) * 0.08;
-          gl_FragColor = vec4(uCol * (shade + sheen), uOp + sheen * 0.45);
+          vec3 c0 = uCol * (shade + sheen);
+          vec3 c1 = mix(uReal * (0.9 + 0.1 * top), vec3(1.0), sheen * 3.0);
+          gl_FragColor = vec4(mix(c0, c1, lv.x) + uEdge * lv.y * 0.3, mix(uOp, uOpR, lv.x) + sheen * 0.45 + lv.y * 0.12);
           #include <colorspace_fragment>
           return;
-        } else {
-          // Mode 0: warm paper / lime plaster micro-grain
-          tex = (n2(uv * 5.5) - 0.5) * 0.018 + (h2(floor(uv * 90.0)) - 0.5) * 0.016;
         }
-        vec3 col = uCol * (shade + tex * uTex) + uGlow;
-        gl_FragColor = vec4(col, uOp);
+        vec3 col = uCol * (shade + texOf(uMode, p, uv, top) * uTex) + uGlow;
+        if (lv.x > 0.002) {
+          vec3 cr = uReal * dayLight(n) * (1.0 + texOf(uRealMode, p, uv, top) * uRealTex) + uRealGlow * (0.6 + 0.4 * uLive);
+          col = mix(col, cr, lv.x);
+        }
+        gl_FragColor = vec4(col + uEdge * lv.y * 0.3, mix(uOp, uOpR, lv.x));
         #include <colorspace_fragment>
       }`,
     transparent: op < 1, depthWrite: op >= 1, side: o.side ?? THREE.FrontSide,
@@ -249,8 +365,10 @@ export function stdMat(hex, o = {}) {
 export function hullMat(px = 1, color = INK) {
   const m = new THREE.MeshBasicMaterial({ color, side: THREE.BackSide });
   m.onBeforeCompile = s => {
-    s.uniforms.uPx = { value: px }; s.uniforms.uRes = { value: ctx.res }; addDraw(s);
-    s.fragmentShader = DRAW_GLSL + s.fragmentShader.replace('#include <clipping_planes_fragment>', 'if (drawOrder(vWD) > uDrawFill) discard;\n#include <clipping_planes_fragment>');
+    s.uniforms.uPx = { value: px }; s.uniforms.uRes = { value: ctx.res }; addDraw(s); addLive(s);
+    s.fragmentShader = DRAW_GLSL + LIVE_GLSL + s.fragmentShader
+      .replace('#include <clipping_planes_fragment>', 'if (drawOrder(vWD) > uDrawFill) discard;\n#include <clipping_planes_fragment>')
+      .replace('#include <tonemapping_fragment>', 'gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.42, 0.38, 0.34), liveAt(vWD).x);\n#include <tonemapping_fragment>');
     s.vertexShader = 'varying vec3 vWD;\n' + s.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n vWD = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     s.vertexShader = 'uniform float uPx; uniform vec2 uRes;\n' + s.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
       { vec4 cn = projectionMatrix * vec4(normalize(normalMatrix * normal), 0.0);
@@ -466,4 +584,210 @@ export function boxUV(g, scale = 1, along = null) {
   }
   g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   return g;
+}
+
+// ---------- the world around the drawing. One screen-sized quad behind everything: it casts each pixel's ray,
+// finds the ground or the sky, and shows the black sheet until the colour reaches that point.
+const ASPECT = { value: 1 };
+export const ENV = {
+  uInvProj: { value: camera.projectionMatrixInverse }, uCamW: { value: camera.matrixWorld }, uCamPos: { value: camera.position },
+  uGroundY: { value: 0 }, uPaper: { value: new THREE.Color(PAPER) }, uAspect: ASPECT,
+  uZenith: { value: new THREE.Color('#3b84d4') }, uMid: { value: new THREE.Color('#7fb5ea') }, uHorizon: { value: new THREE.Color('#d9ecfa') },
+};
+// The colour is not a world but a picture laid over the whole screen, as in an architect's illustration: a clear
+// blue sky, brighter towards the bottom, with soft white clouds drifting across. Where the colour has reached
+// is still worked out in the world (the ground each pixel looks at, or a point in the sky), so it spreads from
+// the building outwards across the screen.
+export const envMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
+  uniforms: { ...ENV, ...LIVE },
+  vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.999, 1.0); }`,
+  fragmentShader: LIVE_GLSL + `varying vec2 vUv;
+    uniform mat4 uInvProj; uniform mat4 uCamW; uniform vec3 uCamPos; uniform float uGroundY; uniform vec3 uPaper; uniform float uAspect;
+    uniform vec3 uZenith; uniform vec3 uMid; uniform vec3 uHorizon;
+    void main() {
+      vec4 v = uInvProj * vec4(vUv * 2.0 - 1.0, 1.0, 1.0); v.xyz /= v.w;
+      vec3 rd = normalize((uCamW * vec4(v.xyz, 0.0)).xyz), ro = uCamPos, P;
+      if (rd.y < -0.0004 && ro.y > uGroundY) { P = ro + rd * ((uGroundY - ro.y) / rd.y); float d = length(P.xz); if (d > 20.0) P.xz *= 20.0 / d; }
+      else { P = ro + rd * 18.0; if (length(P) > 21.0) P = normalize(P) * 21.0; }
+      vec2 lv = liveAt(P);
+      vec2 q = vUv, a = vec2(uAspect, 1.0);
+      vec3 col = mix(uHorizon, uMid, smoothstep(0.0, 0.6, q.y));
+      col = mix(col, uZenith, smoothstep(0.5, 1.08, q.y));
+      col += vec3(1.0, 0.95, 0.85) * 0.16 * exp(-length((q - vec2(0.16, 0.95)) * a) * 2.4);
+      vec2 cp = q * a * vec2(1.25, 3.0) + vec2(uTime * 0.007, 0.0);
+      float c = lvN(vec3(cp, 0.0)) * 0.52 + lvN(vec3(cp * 2.2, 1.3)) * 0.3 + lvN(vec3(cp * 4.6, 2.7)) * 0.18;
+      float band = smoothstep(0.18, 0.5, q.y) * (1.0 - smoothstep(0.92, 1.0, q.y));
+      float cl = smoothstep(0.55, 0.7, c) * band;
+      col = mix(col, mix(vec3(0.78, 0.85, 0.94), vec3(1.0), smoothstep(0.58, 0.78, c)), cl * 0.92);
+      gl_FragColor = vec4(mix(uPaper, col, lv.x) + uEdge * lv.y * 0.22, 1.0);
+      #include <colorspace_fragment>
+    }`,
+  depthTest: false, depthWrite: false,
+}));
+envMesh.frustumCulled = false; envMesh.renderOrder = -1000; scene.add(envMesh);
+
+// ---------- transitions between the sheets: a screen quad over everything. 1 wipe, 2 iris, 3 blinds, 4 dissolve.
+// t = 0 shows the drawing, t = 1 covers it. Every edge is drawn in glacier cyan.
+export const FX = {
+  uMode: { value: 0 }, uT: { value: 0 }, uC: { value: new THREE.Vector2(0.5, 0.5) }, uDir: { value: new THREE.Vector2(0, 1) },
+  uAspect: ASPECT, uCover: { value: new THREE.Color('#050506') }, uFxEdge: { value: new THREE.Color(ACCENT2) }, uFxTime: { value: 0 },
+};
+export const fxMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
+  uniforms: FX,
+  vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+  fragmentShader: `varying vec2 vUv; uniform float uMode; uniform float uT; uniform vec2 uC; uniform vec2 uDir; uniform float uAspect; uniform vec3 uCover; uniform vec3 uFxEdge; uniform float uFxTime;
+    float fh(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float fn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+      return mix(mix(fh(i), fh(i + vec2(1, 0)), f.x), mix(fh(i + vec2(0, 1)), fh(i + vec2(1, 1)), f.x), f.y); }
+    void main() {
+      if (uT <= 0.0001) discard;
+      vec2 q = vUv, a = vec2(uAspect, 1.0);
+      float n = fn(q * a * 7.0 + uFxTime * 0.3) * 0.65 + fn(q * a * 23.0) * 0.35 - 0.5;
+      float cov = 0.0, edge = 0.0;
+      if (uMode < 1.5) {
+        // wipe: a straight front with a ragged edge and a scan line
+        float s = dot((q - 0.5) * a, normalize(uDir)) / (0.5 * length(a)) * 0.5 + 0.5 + n * 0.035;
+        float f = uT * 1.12 - 0.06;
+        cov = 1.0 - smoothstep(f - 0.004, f + 0.004, s);
+        edge = exp(-pow((s - f) * 70.0, 2.0)) + 0.35 * exp(-pow((s - f + 0.03) * 22.0, 2.0));
+      } else if (uMode < 2.5) {
+        // iris: a circle closes on a point
+        float r = length((q - uC) * a) + n * 0.02, R = (1.0 - uT) * 1.25 * length(a);
+        cov = smoothstep(R - 0.003, R + 0.003, r);
+        edge = exp(-pow((r - R) * 90.0, 2.0)) + 0.3 * exp(-pow((r - R) * 25.0, 2.0));
+      } else if (uMode < 3.5) {
+        // blinds: slats close one after another, top to bottom
+        float N = 9.0, k = floor((1.0 - q.y) * N), fy = fract((1.0 - q.y) * N);
+        float t = clamp(uT * 1.7 - k / N * 0.7, 0.0, 1.0);
+        cov = step(fy, t);
+        edge = exp(-pow((fy - t) * N * 9.0, 2.0)) * step(0.001, t) * step(t, 0.999);
+      } else {
+        // dissolve: the drawing breaks up into soft cells
+        float v = fn(q * a * 9.0) * 0.6 + fn(q * a * 31.0) * 0.4;
+        float f = uT * 1.2 - 0.1;
+        cov = 1.0 - smoothstep(f - 0.015, f + 0.015, v);
+        edge = exp(-pow((v - f) * 40.0, 2.0));
+      }
+      edge *= 1.0 - smoothstep(0.85, 1.0, uT);
+      vec3 col = mix(uCover, uFxEdge * 1.25, clamp(edge, 0.0, 1.0) * (1.0 - cov * 0.6));
+      gl_FragColor = vec4(col, max(cov, clamp(edge, 0.0, 1.0) * 0.95));
+    }`,
+  transparent: true, depthTest: false, depthWrite: false,
+}));
+fxMesh.frustumCulled = false; fxMesh.renderOrder = 10000; scene.add(fxMesh);
+
+// ---------- motes: specks of dust and pollen drifting in the light, only where the colour is
+export function motes(o) {
+  const n = o.n ?? 400, r = rng(o.seed ?? 11);
+  const g = new THREE.BufferGeometry(), pos = new Float32Array(n * 3), ph = new Float32Array(n * 2);
+  const [x0, y0, z0] = o.min, [x1, y1, z1] = o.max;
+  for (let i = 0; i < n; i++) { pos.set([lerp(x0, x1, r()), lerp(y0, y1, r()), lerp(z0, z1, r())], i * 3); ph.set([r() * 6.283, 0.5 + r()], i * 2); }
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aPh', new THREE.BufferAttribute(ph, 2));
+  const m = new THREE.ShaderMaterial({
+    uniforms: { ...LIVE, uSize: { value: o.size ?? 0.03 }, uRes: { value: ctx.res }, uCol: { value: new THREE.Color(o.color ?? '#ffe2b0') },
+      uMin: { value: new THREE.Vector3(x0, y0, z0) }, uSpan: { value: new THREE.Vector3(x1 - x0, y1 - y0, z1 - z0) } },
+    vertexShader: LIVE_GLSL + `attribute vec2 aPh; uniform float uSize; uniform vec2 uRes; uniform vec3 uMin; uniform vec3 uSpan; varying float vA;
+      void main() {
+        vec3 p = position; float sp = aPh.y;
+        p.y = uMin.y + mod(p.y - uMin.y + uTime * 0.05 * sp, uSpan.y);
+        p.x += sin(uTime * 0.23 * sp + aPh.x) * 0.4; p.z += cos(uTime * 0.19 * sp + aPh.x * 1.3) * 0.4;
+        vec4 wp = modelMatrix * vec4(p, 1.0);
+        float k = (p.y - uMin.y) / uSpan.y;
+        float edgeFade = smoothstep(0.0, 0.12, k) * (1.0 - smoothstep(0.88, 1.0, k));
+        vA = liveAt(wp.xyz).x * uLive * edgeFade * (0.45 + 0.55 * sin(uTime * 1.6 * sp + aPh.x * 3.0) * sin(uTime * 0.7 + aPh.x));
+        vec4 mv = viewMatrix * wp; gl_Position = projectionMatrix * mv;
+        gl_PointSize = clamp(uSize * projectionMatrix[1][1] * uRes.y * 0.5 / max(-mv.z, 0.01), 1.0, 9.0);
+      }`,
+    fragmentShader: `uniform vec3 uCol; varying float vA;
+      void main() { float d = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.0, d); a *= a; if (vA * a < 0.003) discard;
+        gl_FragColor = vec4(uCol * a * max(vA, 0.0), 1.0); }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  });
+  const pts = new THREE.Points(g, m); pts.frustumCulled = false; pts.renderOrder = 5; scene.add(pts);
+  return pts;
+}
+
+// ---------- dimensions: a dimension line with extension lines and ticks in glacier cyan, riding with its part,
+// and its figure set along the line in the page font
+export class Dims {
+  constructor(root = document.getElementById('dims')) { this.root = root; this.items = []; this.groups = new Map(); this.panels = []; }
+  // a build-up schedule on the sheet, with a leader to the place it describes
+  panel(key, obj, at, html) {
+    const el = document.createElement('div'); el.className = 'dimpanel'; el.innerHTML = html; this.root.appendChild(el);
+    const svg = document.getElementById('leaders'), NS = 'http://www.w3.org/2000/svg';
+    const g = document.createElementNS(NS, 'g'); g.setAttribute('class', 'dimlead');
+    g.innerHTML = '<polyline class="halo"/><polyline/><circle r="3.2" class="halo"/><circle r="2.3"/>';
+    svg.appendChild(g);
+    this.panels.push({ key, obj, at, el, g, op: 0 });
+  }
+  mat(key) {
+    if (!this.groups.has(key)) this.groups.set(key, lineMat({ w: 1.05, color: ACCENT2, opacity: 0, depthTest: false, live: false }));
+    return this.groups.get(key);
+  }
+  // a, b: the measured points (local to obj); off: where the dimension line runs, as an offset from them
+  add(key, obj, a, b, off, text, o = {}) {
+    const A = a.clone().add(off), B = b.clone().add(off), dir = B.clone().sub(A).normalize(), on = off.clone().normalize();
+    const over = on.clone().multiplyScalar(o.over ?? 0.12), gap = on.clone().multiplyScalar(o.gap ?? 0.06);
+    const t = dir.clone().add(on).normalize().multiplyScalar(o.tick ?? 0.09);
+    const L = [];
+    if (o.ext !== false) for (const [p, q] of [[a, A], [b, B]]) { const s = p.clone().add(gap), e = q.clone().add(over); L.push([s.x, s.y, s.z, e.x, e.y, e.z]); }
+    L.push([A.x, A.y, A.z, B.x, B.y, B.z]);
+    for (const p of [A, B]) L.push([p.x - t.x, p.y - t.y, p.z - t.z, p.x + t.x, p.y + t.y, p.z + t.z]);
+    const line = segs(obj, L, this.mat(key)); line.renderOrder = 6;
+    return this._item(key, obj, A, B, text, o);
+  }
+  // a pitch: an arc from a horizontal leg to the slope, the angle written beside it
+  angle(key, obj, c, u, v, r, text, o = {}) {
+    const L = [], n = 14;
+    const ang = u.angleTo(v), ax = u.clone().cross(v).normalize();
+    for (let i = 0; i < n; i++) {
+      const p = u.clone().applyAxisAngle(ax, ang * i / n).multiplyScalar(r).add(c), q = u.clone().applyAxisAngle(ax, ang * (i + 1) / n).multiplyScalar(r).add(c);
+      L.push([p.x, p.y, p.z, q.x, q.y, q.z]);
+    }
+    const e = u.clone().multiplyScalar(r * 1.35).add(c); L.push([c.x, c.y, c.z, e.x, e.y, e.z]);
+    const line = segs(obj, L, this.mat(key)); line.renderOrder = 6;
+    const mid = u.clone().applyAxisAngle(ax, ang / 2).multiplyScalar(r * 1.45).add(c);
+    return this._item(key, obj, mid, mid, text, { ...o, flat: true });
+  }
+  _item(key, obj, A, B, text, o) {
+    const el = document.createElement('div'); el.className = 'dim' + (o.cls ? ' ' + o.cls : '');
+    el.innerHTML = `<b>${text}</b>${o.sub ? `<span>${o.sub}</span>` : ''}`;
+    this.root.appendChild(el);
+    const it = { key, obj, A, B, el, o, op: 0 }; this.items.push(it); return it;
+  }
+  setOp(key, v) {
+    const m = this.groups.get(key); if (m) m.opacity = v;
+    for (const it of this.items) if (it.key === key) it.op = v;
+    for (const pn of this.panels) if (pn.key === key) pn.op = v;
+  }
+  update() {
+    const W = ctx.W, H = ctx.H, pa = new THREE.Vector3(), pb = new THREE.Vector3();
+    for (const pn of this.panels) {
+      const show = pn.op > 0.01 && !ctx.phone;
+      pn.el.style.opacity = show ? pn.op : 0; pn.g.style.opacity = show ? pn.op : 0;
+      if (!show) continue;
+      pn.obj.updateWorldMatrix(true, false);
+      pa.copy(pn.at).applyMatrix4(pn.obj.matrixWorld).project(camera);
+      const ax = (pa.x * .5 + .5) * W, ay = (-pa.y * .5 + .5) * H, r = pn.el.getBoundingClientRect();
+      // up from the panel's top edge, then a short diagonal into the point
+      const sx = clamp(ax - 36, r.left + 24, r.right - 16), sy = r.top - 1, ey = Math.min(sy - 10, ay + 36);
+      const pts = `${sx},${sy} ${sx},${ey} ${ax},${ay}`;
+      const [h, l, ch, c] = pn.g.children;
+      h.setAttribute('points', pts); l.setAttribute('points', pts);
+      for (const e of [ch, c]) { e.setAttribute('cx', ax); e.setAttribute('cy', ay); }
+    }
+    for (const it of this.items) {
+      if (it.op < 0.01) { it.el.style.opacity = 0; continue; }
+      it.obj.updateWorldMatrix(true, false);
+      pa.copy(it.A).applyMatrix4(it.obj.matrixWorld).project(camera); pb.copy(it.B).applyMatrix4(it.obj.matrixWorld).project(camera);
+      if (pa.z > 1 || pb.z > 1) { it.el.style.opacity = 0; continue; }
+      const ax = (pa.x * .5 + .5) * W, ay = (-pa.y * .5 + .5) * H, bx2 = (pb.x * .5 + .5) * W, by = (-pb.y * .5 + .5) * H;
+      let ang = it.o.flat ? 0 : Math.atan2(by - ay, bx2 - ax);
+      if (ang > Math.PI / 2) ang -= Math.PI;
+      if (ang < -Math.PI / 2) ang += Math.PI;
+      const side = it.o.below ? '4px' : 'calc(-100% - 3px)';
+      it.el.style.transform = `translate(${(ax + bx2) / 2}px, ${(ay + by) / 2}px) rotate(${ang}rad) translate(-50%, ${side})`;
+      it.el.style.opacity = it.op;
+    }
+  }
 }

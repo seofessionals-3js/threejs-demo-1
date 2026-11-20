@@ -20,7 +20,7 @@ function rb(x0, y0, z0, x1, y1, z1, r = 0.04) {
 
 export async function build(labels) {
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  scene.add(new THREE.HemisphereLight('#ffffff', '#8f8f98', 2.3));
+  const hemi = new THREE.HemisphereLight('#ffffff', '#8f8f98', 2.3); scene.add(hemi);
   // the pendant throws a crisp pool on the table once you are inside (no soft glow on the ceiling)
   const lamp = new THREE.SpotLight('#fff3e6', 0, 4, 0.62, 0.12, 1.2);
   lamp.position.set(TX, 2.05, TZ); lamp.target.position.set(TX, 0, TZ); scene.add(lamp, lamp.target);
@@ -34,30 +34,33 @@ export async function build(labels) {
   scene.add(sun, sun.target);
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(90, 90).rotateX(-Math.PI / 2), new THREE.ShadowMaterial({ color: '#000000', opacity: 0.3 }));
   ground.position.y = -0.125; ground.receiveShadow = true; scene.add(ground);
+  // in colour the box stands on a small lawn that fades into the sky
+  const lawn = new THREE.Mesh(new THREE.PlaneGeometry(18, 18).rotateX(-Math.PI / 2), patchFill(new THREE.MeshBasicMaterial({ color: '#ffffff' }), { wash: false, grain: 0, grade: false, ground: true, island: [0, 0, 8, 8, 1] }));
+  lawn.position.y = -0.13; lawn.renderOrder = -5; scene.add(lawn);
 
   const T = buildTextures();
   const PAL = {
-    plaster: { mat: stdMat('#2b2b30', { rough: 0.9, map: T.plaster, bumpMap: T.plasterBump, bumpScale: 0.004 }), uvScale: 0.35 },
-    ceiling: { mat: stdMat('#303035', { rough: 0.92, map: T.plaster, bumpMap: T.plasterBump, bumpScale: 0.003, emissive: '#1c1c20', emissiveIntensity: 0.22 }), uvScale: 0.35 },
-    base: { mat: stdMat('#1b1b1e', { rough: 0.88, bumpMap: T.plasterBump, bumpScale: 0.005 }), uvScale: 0.5 },
+    plaster: { mat: stdMat('#2b2b30', { real: '#f5eee2', rough: 0.9, map: T.plaster, bumpMap: T.plasterBump, bumpScale: 0.004 }), uvScale: 0.35 },
+    ceiling: { mat: stdMat('#303035', { real: '#f8f3ea', rough: 0.92, map: T.plaster, bumpMap: T.plasterBump, bumpScale: 0.003, emissive: '#1c1c20', emissiveIntensity: 0.22 }), uvScale: 0.35 },
+    base: { mat: stdMat('#1b1b1e', { real: '#d8cfc2', rough: 0.88, bumpMap: T.plasterBump, bumpScale: 0.005 }), uvScale: 0.5 },
     floor: { mat: stdMat('#5c5c62', { map: T.floor.map, bumpMap: T.floor.bump, bumpScale: 0.024, rough: 0.52, env: 0.55 }), thr: 60 },
     oak: { mat: stdMat('#7c7c82', { map: T.oak.map, bumpMap: T.oak.bump, bumpScale: 0.018, rough: 0.56, env: 0.5 }), uvScale: 0.8 },
     walnut: { mat: stdMat('#8e8e94', { map: T.walnut.map, bumpMap: T.walnut.bump, bumpScale: 0.02, rough: 0.44, env: 0.6 }), uvScale: 0.8 },
-    sage: { mat: stdMat('#1a1a1d', { rough: 0.58, bumpMap: T.oak.bump, bumpScale: 0.008 }), uvScale: 0.8 },
+    sage: { mat: stdMat('#1a1a1d', { real: '#3b423d', rough: 0.58, bumpMap: T.oak.bump, bumpScale: 0.008 }), uvScale: 0.8 },
     tile: { mat: stdMat('#e2e2e6', { map: T.zellige.map, bumpMap: T.zellige.bump, bumpScale: 0.022, rough: 0.24, env: 0.68 }), thr: 60 },
-    steel: { mat: stdMat('#8e8e94', { rough: 0.32, metal: 0.72, env: 0.75 }) },
-    linen: { mat: stdMat('#dcd9d4', { rough: 0.92, bumpMap: T.fabricBump, bumpScale: 0.02 }), uvScale: 2.2 },
-    cushion: { mat: stdMat('#dcd9d4', { rough: 0.92, bumpMap: T.fabricBump, bumpScale: 0.02 }), uvScale: 2.2, hull: 1, thr: 50 },
-    pillow: { mat: stdMat('#c2202b', { rough: 0.88, bumpMap: T.fabricBump, bumpScale: 0.022 }), uvScale: 2.2, hull: 1, thr: 50 },
-    rust: { mat: stdMat('#c2202b', { rough: 0.78, bumpMap: T.plasterBump, bumpScale: 0.012 }), uvScale: 1.0 },
+    steel: { mat: stdMat('#8e8e94', { real: '#b7bbbf', rough: 0.32, metal: 0.72, env: 0.75 }) },
+    linen: { mat: stdMat('#dcd9d4', { real: '#e6dac6', rough: 0.92, bumpMap: T.fabricBump, bumpScale: 0.02 }), uvScale: 2.2 },
+    cushion: { mat: stdMat('#dcd9d4', { real: '#e9dfce', rough: 0.92, bumpMap: T.fabricBump, bumpScale: 0.02 }), uvScale: 2.2, hull: 1, thr: 50 },
+    pillow: { mat: stdMat('#c2202b', { real: '#cf9f72', rough: 0.88, bumpMap: T.fabricBump, bumpScale: 0.022 }), uvScale: 2.2, hull: 1, thr: 50 },
+    rust: { mat: stdMat('#c2202b', { real: '#c98a5a', rough: 0.78, bumpMap: T.plasterBump, bumpScale: 0.012 }), uvScale: 1.0 },
     ink: { mat: stdMat('#0f0f11', { rough: 0.42, metal: 0.35 }) },
-    frame: { mat: stdMat('#141416', { rough: 0.46, metal: 0.25 }) },
-    glass: { mat: stdMat('#dfe6ea', { opacity: 0.2, rough: 0.08, env: 0.8 }), cast: false, edges: false },
+    frame: { mat: stdMat('#141416', { real: '#2d2824', rough: 0.46, metal: 0.25 }) },
+    glass: { mat: stdMat('#dfe6ea', { real: '#c2e8f0', opacity: 0.2, rough: 0.08, env: 0.8 }), cast: false, edges: false },
     rug: { mat: stdMat('#a0a0a0', { map: T.rug.map, bumpMap: T.rug.bump, bumpScale: 0.034, rough: 0.92 }), thr: 60 },
-    shade: { mat: stdMat('#fff8ee', { emissive: '#f2ece2', emissiveIntensity: 0.55, bumpMap: T.fabricBump, bumpScale: 0.01 }), uvScale: 1.5, hull: 1, edges: false },
-    leaf: { mat: stdMat('#2f3431', { rough: 0.78, side: THREE.DoubleSide }), w: 'mid', thr: 20 },
-    pot: { mat: stdMat('#d6d3ce', { rough: 0.82, bumpMap: T.plasterBump, bumpScale: 0.016 }), uvScale: 1.0, hull: 1 },
-    cream: { mat: stdMat('#e9e6e1', { rough: 0.38 }), hull: 1 },
+    shade: { mat: stdMat('#fff8ee', { real: '#fff1d8', emissive: '#f2ece2', emissiveIntensity: 0.55, bumpMap: T.fabricBump, bumpScale: 0.01 }), uvScale: 1.5, hull: 1, edges: false },
+    leaf: { mat: stdMat('#2f3431', { real: '#86a46a', sway: 0.012, rough: 0.78, side: THREE.DoubleSide }), w: 'mid', thr: 20 },
+    pot: { mat: stdMat('#d6d3ce', { real: '#c27a52', rough: 0.82, bumpMap: T.plasterBump, bumpScale: 0.016 }), uvScale: 1.0, hull: 1 },
+    cream: { mat: stdMat('#e9e6e1', { real: '#efe5d3', rough: 0.38 }), hull: 1 },
     artA: { mat: stdMat('#ffffff', { map: T.artA, bumpMap: T.fabricBump, bumpScale: 0.012, rough: 0.78 }) },
     artB: { mat: stdMat('#ffffff', { map: T.artB, bumpMap: T.fabricBump, bumpScale: 0.012, rough: 0.78 }) },
     b1: { mat: stdMat('#a14a33', { rough: 0.7 }), w: 'mid' }, b2: { mat: stdMat('#2f4b5e', { rough: 0.7 }), w: 'mid' }, b3: { mat: stdMat('#d9c8a1', { rough: 0.75 }), w: 'mid' }, b4: { mat: stdMat('#5d6c3d', { rough: 0.7 }), w: 'mid' }, b5: { mat: stdMat('#272623', { rough: 0.65 }), w: 'mid' },
@@ -332,8 +335,37 @@ export async function build(labels) {
   // what stays on the paper: titles, the finishes schedules, the title block
   decal(groundMat, SH.x0, SH.z0, SH.x0 + SH.w, SH.z0 + SH.d, 0.16, null);
 
+  const C = c => new THREE.Color(c);
+  const W0 = { hemi: C('#ffffff'), ground: C('#8f8f98'), sun: C('#ffffff') }, W1 = { hemi: C('#ffffff'), ground: C('#efe2cc'), sun: C('#fff2dc') };
   return {
     update, keys, R: 40,
+    // sunlight pours in through the east window and fills the kitchen, the box and the garden around it;
+    // at the end it leaves the way it came, back out through the window
+    live: {
+      at: 0.7, soft: 1.6,
+      in: { dir: [0, 0, 0], radial: 1, c: [3.25, 1.45, 0], min: 0, max: 30, noise: 1.4, dur: 3.5, pow: 1.3 },
+      out: { dir: [0, 0, 0], radial: -1, c: [3.25, 1.45, 0], min: -27, max: 0.6, noise: 1.2, dur: 4.0, pow: 0.5 },
+      sun: [0.8, 0.55, 0.25], groundY: -0.125,
+      motes: { n: 240, min: [-2.9, 0.15, -2.3], max: [2.9, 2.75, 2.3], size: 0.011, color: '#fff2da' },
+    },
+    liveHook: (g) => {
+      hemi.color.copy(W0.hemi).lerp(W1.hemi, g); hemi.groundColor.copy(W0.ground).lerp(W1.ground, g);
+      sun.color.copy(W0.sun).lerp(W1.sun, g); sun.intensity = 2.6 + 0.4 * g; hemi.intensity = 2.3 + 0.6 * g;
+      ground.material.opacity = 0.3 - 0.14 * g;
+    },
+    // in: an iris opens on the sheet; out: the picture is wiped away like a turned page
+    xfer: { in: { mode: 'iris', c: [0.5, 0.5] }, out: { mode: 'wipe', dir: [1, 0] } },
+    // the sheet turns into place under the long lens; on the way out you turn towards the window
+    camFx: (c, inU, outU) => {
+      if (inU > 0 && !c.pos) { c.az -= 75 * inU * inU; c.h *= 1 + 0.32 * inU; }
+      if (outU > 0 && c.pos) {
+        const a = 0.42 * outU, dx = c.t[0] - c.pos[0], dz = c.t[2] - c.pos[2];
+        c.t[0] = c.pos[0] + dx * Math.cos(a) - dz * Math.sin(a); c.t[2] = c.pos[2] + dx * Math.sin(a) + dz * Math.cos(a);
+      }
+    },
+    play: { dur: 62 },
+    // from the window seat the camera spirals once round and out to the door wall
+    swirl: { c: [0, 1.3, 0], pos: [6.6, 3.9, 8.4], look: [0.4, 1.3, 0.2], fov: 42, lift: 2 },
     // shadows arrive with the fills, so nothing casts a shadow before it has been drawn
     introHook: (T) => { sun.shadow.intensity = win(T, 3.3, 3.9); },
     draw: { dir: [0, 0, 0], radial: 1, c: [0, 0, 0], min: 0, max: 12, soft: 1.0 },

@@ -60,47 +60,50 @@ function slope(side, x0, x1, w0, w1, z0, tEnd) {
   return panel(pts.map(([z, y]) => [side * z, y]), [], x1 - x0).applyMatrix4(M.alongZ(x1, 0));
 }
 
-export async function build(labels) {
+export async function build(labels, dims) {
   const dk = lineMat({ w: 0.95, color: '#151517', opacity: 0.9 });       // ink for the light things
   const light = { line: dk, hullColor: '#151517' };
+  // every material has its drawn tone and, after "real", the colour it has when the house comes alive:
+  // spruce CLT inside, smoked oak floors, charred larch outside, black zinc on top, warm lamps
+  const swayLine = lineMat({ w: 0.9, sway: 0.016 });
   const PAL = {
-    wall: { mat: toneMat('#26262a', { mode: 0, scale: 1.0, tex: 1.6 }) },
-    ceil: { mat: toneMat('#2c2c30', { mode: 1, scale: 0.9, tex: 1.4 }) },
-    floor: { mat: toneMat('#3f3b37', { mode: 1, scale: 1.2 }) },
-    deck: { mat: toneMat('#2a2826', { mode: 1, scale: 1.8 }) },
-    pool: { mat: toneMat('#8a8178', { mode: 0, opacity: 0.22, tex: 0 }), edges: false },
-    firepool: { mat: toneMat('#c02a2a', { mode: 0, opacity: 0.11, tex: 0 }), edges: false },
-    oak: { mat: toneMat('#57514b', { mode: 1, scale: 1.6 }) },
-    concrete: { mat: toneMat('#58585d', { mode: 2, scale: 1.0, tex: 1.8 }) },
-    glass: { mat: toneMat('#e6ecf0', { opacity: 0.085, mode: 5 }) },
-    clad: { mat: toneMat('#161618', { mode: 1, scale: 2.2, tex: 3.2 }), w: 'thin' },
-    seam: { mat: toneMat('#1c1c1f', { mode: 3, scale: 1.5, tex: 3.0 }), w: 'thin' },
-    under: { mat: toneMat('#34343a', { mode: 1, scale: 1.0, tex: 1.6 }) },
-    rafter: { mat: toneMat('#6a645d', { mode: 1, scale: 2.0 }), w: 'mid' },
-    steel: { mat: toneMat('#2b2b30', { mode: 3, scale: 2.0 }), w: 'thin' },
-    pipe: { mat: toneMat('#222226', { mode: 3, scale: 2.0 }), w: 'thin', hull: 1 },
-    rod: { mat: toneMat('#3a3a40', { mode: 3, scale: 2.0, tex: 1 }), edges: false, hull: 0.8 },
-    kfront: { mat: toneMat('#19191c', { mode: 0, scale: 1.0, tex: 1.2 }) },
-    bright: { mat: toneMat('#e7e4df', { mode: 0, tex: 0.9 }), ...light },
-    leaf: { mat: toneMat('#2b2f2c', { side: THREE.DoubleSide, mode: 0 }), w: 'mid', thr: 20 },
-    frame: { mat: toneMat('#17171a', { mode: 1, scale: 2.0 }) },
-    redframe: { mat: toneMat('#c8141f', { mode: 3, scale: 2.0, tex: 1.2 }) },
-    rug: { mat: toneMat('#4b4b51', { mode: 4, scale: 1.0, tex: 1.8 }) },
-    soft: { mat: toneMat('#dcd9d3', { mode: 4, scale: 1.0, tex: 0.9 }), hull: 1, ...light },
-    cushion: { mat: toneMat('#e2dfd9', { mode: 4, scale: 1.4, tex: 0.9 }), hull: 1, thr: 50, ...light },
-    rouge: { mat: toneMat('#cc1f2b', { mode: 4, scale: 1.4, tex: 1.3 }), hull: 1, thr: 50, ...light },
-    shade: { mat: toneMat('#fff3e2', { mode: 4, scale: 1.5, tex: 0.5, glow: '#262019' }), hull: 1, ...light },
-    ember: { mat: toneMat('#ff3526', { mode: 0, tex: 0, glow: '#3a0603' }), edges: false },
-    book1: { mat: toneMat('#c81e2a', { mode: 0, tex: 1 }), w: 'thin' },
-    book2: { mat: toneMat('#e7e4df', { mode: 0, tex: 1 }), w: 'thin', ...light },
-    book3: { mat: toneMat('#6c6c72', { mode: 0, tex: 1 }), w: 'thin' },
+    wall: { mat: toneMat('#26262a', { mode: 0, scale: 1.0, tex: 1.6, real: '#efe3cf', realMode: 0, realTex: 1.2 }) },
+    ceil: { mat: toneMat('#2c2c30', { mode: 1, scale: 0.9, tex: 1.4, real: '#e8cfa6', realTex: 1.4 }) },
+    floor: { mat: toneMat('#3f3b37', { mode: 1, scale: 1.2, real: '#dcc29a', realTex: 1.8 }) },
+    deck: { mat: toneMat('#2a2826', { mode: 1, scale: 1.8, real: '#e6d8c0', realMode: 2, realTex: 1.0 }) },
+    pool: { mat: toneMat('#8a8178', { mode: 0, opacity: 0.22, tex: 0, real: '#ffe6b8', realOp: 0.16 }), edges: false },
+    firepool: { mat: toneMat('#c02a2a', { mode: 0, opacity: 0.11, tex: 0, real: '#ffb27a', realOp: 0.14 }), edges: false },
+    oak: { mat: toneMat('#57514b', { mode: 1, scale: 1.6, real: '#d2ad7e', realTex: 1.8 }) },
+    concrete: { mat: toneMat('#58585d', { mode: 2, scale: 1.0, tex: 1.8, real: '#efe7da', realTex: 1.2 }) },
+    glass: { mat: toneMat('#e6ecf0', { opacity: 0.085, mode: 5, real: '#c2e8f0', realOp: 0.34 }) },
+    clad: { mat: toneMat('#161618', { mode: 1, scale: 2.2, tex: 3.2, real: '#f2ebdf', realMode: 0, realTex: 1.0 }), w: 'thin' },
+    seam: { mat: toneMat('#1c1c1f', { mode: 3, scale: 1.5, tex: 3.0, real: '#d3cdc2', realTex: 1.6 }), w: 'thin' },
+    under: { mat: toneMat('#34343a', { mode: 1, scale: 1.0, tex: 1.6, real: '#ead9b9', realTex: 1.4 }) },
+    rafter: { mat: toneMat('#6a645d', { mode: 1, scale: 2.0, real: '#ebcfa2', realTex: 1.6 }), w: 'mid' },
+    steel: { mat: toneMat('#2b2b30', { mode: 3, scale: 2.0, real: '#3e4145' }), w: 'thin' },
+    pipe: { mat: toneMat('#222226', { mode: 3, scale: 2.0, real: '#3a3c3f' }), w: 'thin', hull: 1 },
+    rod: { mat: toneMat('#3a3a40', { mode: 3, scale: 2.0, tex: 1, real: '#4a4d51' }), edges: false, hull: 0.8 },
+    kfront: { mat: toneMat('#19191c', { mode: 0, scale: 1.0, tex: 1.2, real: '#dcc39b' }) },
+    bright: { mat: toneMat('#e7e4df', { mode: 0, tex: 0.9, real: '#f8f4ec', realMode: 2, realTex: 0.6 }), ...light },
+    leaf: { mat: toneMat('#2b2f2c', { side: THREE.DoubleSide, mode: 0, real: '#8aa66c', sway: 0.016 }), line: swayLine, thr: 20 },
+    frame: { mat: toneMat('#17171a', { mode: 1, scale: 2.0, real: '#2e2e2f' }) },
+    redframe: { mat: toneMat('#c8141f', { mode: 3, scale: 2.0, tex: 1.2, real: '#2e2e2f' }) },
+    rug: { mat: toneMat('#4b4b51', { mode: 4, scale: 1.0, tex: 1.8, real: '#e8dfcc' }) },
+    soft: { mat: toneMat('#dcd9d3', { mode: 4, scale: 1.0, tex: 0.9, real: '#f7f3ec' }), hull: 1, ...light },
+    cushion: { mat: toneMat('#e2dfd9', { mode: 4, scale: 1.4, tex: 0.9, real: '#f4efe7' }), hull: 1, thr: 50, ...light },
+    rouge: { mat: toneMat('#cc1f2b', { mode: 4, scale: 1.4, tex: 1.3, real: '#c9a074' }), hull: 1, thr: 50, ...light },
+    shade: { mat: toneMat('#fff3e2', { mode: 4, scale: 1.5, tex: 0.5, glow: '#262019', real: '#fff6e6', realGlow: '#8a6a3e' }), hull: 1, ...light },
+    ember: { mat: toneMat('#ff3526', { mode: 0, tex: 0, glow: '#3a0603', real: '#ff7a24', realGlow: '#c2400c' }), edges: false },
+    book1: { mat: toneMat('#c81e2a', { mode: 0, tex: 1, real: '#c6a67e' }), w: 'thin' },
+    book2: { mat: toneMat('#e7e4df', { mode: 0, tex: 1, real: '#f2ede3' }), w: 'thin', ...light },
+    book3: { mat: toneMat('#6c6c72', { mode: 0, tex: 1, real: '#93abbb' }), w: 'thin' },
   };
-  const flameMat = toneMat('#ff4a2c', { mode: 0, tex: 0, glow: '#4a0a05', side: THREE.DoubleSide, opacity: 0.92 });
+  const flameMat = toneMat('#ff4a2c', { mode: 0, tex: 0, glow: '#4a0a05', side: THREE.DoubleSide, opacity: 0.92, real: '#ffb347', realGlow: '#ff6a10' });
   const hatchMat = lineMat({ w: 0.6, color: '#8b8883', opacity: 0.62 });
   const dashMat = lineMat({ w: 0.9, color: INK, dashed: true, dash: 0.22, gap: 0.2, opacity: 0.7 });
 
   // ---- the plan the house stands on
-  const plan = new THREE.Mesh(new THREE.PlaneGeometry(24, 16).rotateX(-Math.PI / 2), patchFill(new THREE.MeshBasicMaterial({ map: drawPlan() }), { wash: false, grain: 0, grade: false }));
+  const plan = new THREE.Mesh(new THREE.PlaneGeometry(24, 16).rotateX(-Math.PI / 2), patchFill(new THREE.MeshBasicMaterial({ map: drawPlan() }), { wash: false, grain: 0, grade: false, ground: true, island: [1.6, 0, 12, 8, 0] }));
   plan.position.y = -0.01; scene.add(plan);
 
   const layers = [];
@@ -118,6 +121,7 @@ export async function build(labels) {
   // =====================================================================================================
   // 01 Floor: slab on strip footings, the smoked-oak boards, the terrace deck, everything that stands loose
   const L1 = layer('floor', '01', 'Boden', 'Betonplatte auf Streifenfundamenten', 1);
+  L1.lines.push(swayLine);
   {
     const P = L1.part;
     P.add('concrete', bx(XW, 0, -ZO, XE, FL, ZO),
@@ -514,6 +518,31 @@ export async function build(labels) {
 
   for (const L of layers) { L.part.build(); for (const s of L.subs) s.part.build(); }
 
+  // ---- the roof, measured: what it is built from and how big, in glacier cyan, riding with each floating layer.
+  // A point on the south slope: x along the ridge, w square off the rafter line, t down the slope from the ridge.
+  const PS = (x, w, t) => V(x, Y0 + w * CP - t * SP, w * SP + t * CP);
+  const SLD = V(0, -SP, CP), SLN = V(0, CP, SP);
+  if (dims) {
+    // 06 roof structure
+    dims.add('rafters', L6.g, PS(3.2, 0.22, T), PS(3.8, 0.22, T), SLD.clone().multiplyScalar(0.55), 'e = 600', { sub: 'Sparren KVH 80/220' });
+    dims.add('rafters', L6.g, PS(XR, 0, 0.08), PS(XR, 0, T), SLN.clone().multiplyScalar(-0.42).add(V(0.02, 0, 0)), '5 350', { sub: 'Sparrenlänge', below: true });
+    dims.add('rafters', L6.g, V(XR, Y0 - 0.3, 0.08), V(XR, Y0 + 0.14, 0.08), V(0.5, 0, 0.35), '440', { sub: 'Firstpfette BSH 160/440' });
+    dims.angle('rafters', L6.g, V(XR + 0.02, Y0 - T * SP, T * CP), V(0, 0, -1), V(0, SP, -CP), 1.15, '40°', { sub: 'Dachneigung' });
+    // 07 roof: the seam spacing on the zinc itself, the length along the eave, and the build-up from outside in
+    dims.add('roof', L7.g, PS(-0.85, 0.485, 1.6), PS(-0.4, 0.485, 1.6), SLN.clone().multiplyScalar(0.01), 'e = 450', { sub: 'Stehfalz', ext: false });
+    dims.add('roof', L7.g, PS(-XR, 0.42, T + 0.14), PS(XR, 0.42, T + 0.14), SLD.clone().multiplyScalar(0.75), '10 900', { sub: 'Dachlänge über Ortgang', below: true });
+    dims.panel('roof', L7.g, PS(-XR - 0.02, 0.33, T + 0.035), `
+      <div class="dp-h"><i>07 + 06</i>Dachaufbau · von außen</div>
+      <table>
+        <tr><td>0,7</td><td>Zink-Stehfalz schwarz · Falz 40 · e 450</td></tr>
+        <tr><td>—</td><td>Strukturierte Trennlage</td></tr>
+        <tr><td>200</td><td>Holzfaser-Dämmpaneel λ 0,040</td></tr>
+        <tr><td>220</td><td>Sparren KVH 80/220 · e 600</td></tr>
+        <tr><td>440</td><td>Firstpfette BSH GL24h 160/440</td></tr>
+      </table>
+      <div class="dp-f">Neigung 40° · Überstand 500 · U ≈ 0,19 W/m²K</div>`);
+  }
+
   // ---- the stack: how far each level floats, and the order things land
   const LIFT = { 1: 2.0, 2: 4.3, 3: 9.3, 4: 14.6, 5: 19.6 };
   const PULL = { glazing: 3.2, cladding: 5.6 };
@@ -586,9 +615,15 @@ export async function build(labels) {
   const cmPlan = document.getElementById('cm-plan'), cmZones = document.getElementById('cm-zones'), cmScale = document.getElementById('cm-scale');
   let radFloor = '';
 
-  function update(p) {
+  function update(p, Tm = 99) {
     const land = {};
     for (const id of ORDER) { const [a, b] = landAt(id); land[id] = ease(win(p, a, b)); }
+    // the roof's dimensions come up once the sheet is plotted and leave as each layer lands
+    if (dims) {
+      const d0 = win(Tm, 3.5, 4.3);
+      dims.setOp('rafters', d0 * (1 - win(p, 0.33, 0.36)));
+      dims.setOp('roof', d0 * (1 - win(p, 0.405, 0.43)));
+    }
     const lv = { 1: 1 - land.floor, 2: 1 - land.eg, 3: 1 - land.og, 4: 1 - land.rafters, 5: 1 - land.roof };
     const lift = {}; let acc = 0, prev = 0;
     for (const k of [1, 2, 3, 4, 5]) { acc += (LIFT[k] - prev) * lv[k]; prev = LIFT[k]; lift[k] = acc; }
@@ -666,6 +701,28 @@ export async function build(labels) {
 
   return {
     update, keys, R: 80, introHook,
+    // the house comes alive from its hearth: the colour spreads from the fire through the rooms, out over the
+    // meadow and up into the sky. At the end it drains away from the top, the sky first, the floor last.
+    live: {
+      at: 0.6, soft: 1.8,
+      in: { dir: [0, 0, 0], radial: 1, c: [0.65, 1.0, -2.0], min: 0, max: 30, noise: 2.0, dur: 3.5, pow: 1.3 },
+      out: { dir: [0, -1, 0], radial: 0, min: -23, max: 1.0, noise: 1.4, dur: 4.0, pow: 0.5 },
+      sun: [-0.55, 0.5, 0.67],
+      room: [XW + 0.03, XE - 0.03, -ZO + 0.03, ZO - 0.03], roomY: [-0.5, YP + PL + 0.12, TP, 1],
+      foot: [XW - 0.06, -ZO - 0.06, XE + 0.06, ZO + 0.06], foot2: [3.2, 1.8],
+      groundY: -0.02,
+      motes: { n: 300, min: [-4.7, 0.5, -3.3], max: [4.7, 7.4, 3.3], size: 0.018, color: '#fff3dc' },
+    },
+    // in: the sheet is uncovered from the bottom up, the way it is plotted; out: it breaks up into cells
+    xfer: { in: { mode: 'wipe', dir: [0, -1] }, out: { mode: 'dissolve' } },
+    // the long lens comes down onto the board from high above; on the way out the eye goes up to the ridge
+    camFx: (c, inU, outU) => {
+      if (inU > 0 && !c.pos) { c.el += 30 * inU * inU; c.az -= 14 * inU; c.h *= 1 + 0.6 * inU; }
+      if (outU > 0 && c.pos) { c.t[1] += 2.2 * outU; c.fov *= 1 + 0.1 * outU; }
+    },
+    play: { dur: 80 },
+    // after the ridge room the camera swirls out to a three-quarter view of the front, the glass door and terrace
+    swirl: { c: [0.5, 3.2, 0], pos: [13.5, 5.6, 12.0], look: [0.8, 3.4, 0], fov: 40, lift: 3 },
     colX: () => ctx.phone ? ctx.W - 100 : ctx.W * 0.725,
     draw: { dir: [0, 1, 0], radial: 0, min: -1, max: 29, soft: 1.5 },
     radar: {

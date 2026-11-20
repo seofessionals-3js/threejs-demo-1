@@ -13,7 +13,7 @@ const CORE = [6.4, -7.4, 11.4, -3.2];          // x0, z0, x1, z1: the north-east
 
 export async function build(labels) {
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  scene.add(new THREE.HemisphereLight('#ffffff', '#8f8f98', 2.0), new THREE.AmbientLight('#ffffff', 0.4));
+  const hemi = new THREE.HemisphereLight('#ffffff', '#8f8f98', 2.0); scene.add(hemi, new THREE.AmbientLight('#ffffff', 0.4));
   const sun = new THREE.DirectionalLight('#ffffff', 1.9);
   sun.position.set(-30, 52, 40); sun.castShadow = true; sun.shadow.mapSize.set(4096, 4096);
   Object.assign(sun.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 5, far: 160 });
@@ -23,8 +23,8 @@ export async function build(labels) {
 
   const T = textures();
   const PAL = {
-    card: { mat: stdMat('#101012', { rough: 0.95, bumpMap: T.concBump, bumpScale: 0.006 }), uvScale: 0.2 },
-    street: { mat: stdMat('#18181b', { rough: 0.95, bumpMap: T.concBump, bumpScale: 0.008 }), uvScale: 0.15 },
+    card: { mat: stdMat('#101012', { real: '#f2ede4', rough: 0.95, bumpMap: T.concBump, bumpScale: 0.006 }), uvScale: 0.2 },
+    street: { mat: stdMat('#18181b', { real: '#dcd6cc', rough: 0.95, bumpMap: T.concBump, bumpScale: 0.008 }), uvScale: 0.15 },
     clt: { mat: stdMat('#84848a', { rough: 0.62, map: T.clt, bumpMap: T.cltBump, bumpScale: 0.022, env: 0.5 }) },
     screed: { mat: stdMat('#55555b', { rough: 0.68, map: T.screed, bumpMap: T.concBump, bumpScale: 0.012, env: 0.45 }), uvScale: 0.45, w: 'mid' },
     glulam: { mat: stdMat('#8c8c92', { rough: 0.54, map: T.lamH, bumpMap: T.lamHBump, bumpScale: 0.02, env: 0.55 }) },
@@ -35,15 +35,15 @@ export async function build(labels) {
     concrete: { mat: stdMat('#6e6e74', { rough: 0.84, map: T.stipple, bumpMap: T.concBump, bumpScale: 0.025 }) },
     pier: { mat: stdMat('#6e6e74', { rough: 0.84, map: T.stipple, bumpMap: T.concBump, bumpScale: 0.025 }) },
     core: { mat: stdMat('#45454b', { rough: 0.88, map: T.hatch, bumpMap: T.concBump, bumpScale: 0.02 }) },
-    coreWall: { mat: stdMat('#2e2e33', { rough: 0.88, bumpMap: T.concBump, bumpScale: 0.014 }) },
-    glass: { mat: stdMat('#dfe6ea', { opacity: 0.14, rough: 0.06, env: 0.85 }), cast: false, edges: false },
-    frame: { mat: stdMat('#101012', { rough: 0.42, metal: 0.45, env: 0.65 }) },
-    desk: { mat: stdMat('#e4e1dc', { rough: 0.52, bumpMap: T.cltBump, bumpScale: 0.008 }), uvScale: 0.8 },
-    chair: { mat: stdMat('#46464c', { rough: 0.6 }) , w: 'mid' },
-    green: { mat: stdMat('#2a2e2b', { rough: 0.92, bumpMap: T.concBump, bumpScale: 0.02 }), uvScale: 0.6 },
-    tree: { mat: stdMat('#dedbd6', { rough: 1 }), hull: 1, edges: false },
-    leaf: { mat: stdMat('#3b403c', { rough: 0.88 }), hull: 1, edges: false },
-    figure: { mat: stdMat('#f7f4ee', { side: THREE.DoubleSide }), thr: 20 },
+    coreWall: { mat: stdMat('#2e2e33', { real: '#e8e2d7', rough: 0.88, bumpMap: T.concBump, bumpScale: 0.014 }) },
+    glass: { mat: stdMat('#dfe6ea', { real: '#c2e8f0', opacity: 0.14, rough: 0.06, env: 0.85 }), cast: false, edges: false },
+    frame: { mat: stdMat('#101012', { real: '#2c2b29', rough: 0.42, metal: 0.45, env: 0.65 }) },
+    desk: { mat: stdMat('#e4e1dc', { real: '#efe7da', rough: 0.52, bumpMap: T.cltBump, bumpScale: 0.008 }), uvScale: 0.8 },
+    chair: { mat: stdMat('#46464c', { real: '#9fb3a0', rough: 0.6 }) , w: 'mid' },
+    green: { mat: stdMat('#2a2e2b', { real: '#9cb57e', rough: 0.92, bumpMap: T.concBump, bumpScale: 0.02 }), uvScale: 0.6 },
+    tree: { mat: stdMat('#dedbd6', { real: '#8daa6e', rough: 1 }), hull: 1, edges: false },
+    leaf: { mat: stdMat('#3b403c', { real: '#7f9e62', rough: 0.88 }), hull: 1, edges: false },
+    figure: { mat: stdMat('#f7f4ee', { real: '#ffffff', side: THREE.DoubleSide }), thr: 20 },
   };
   const line = lineMat({ w: 0.8, color: INK, opacity: 0.8 });
   const ctxLine = lineMat({ w: 0.7, color: '#8b8883', opacity: 0.34 });
@@ -264,8 +264,34 @@ export async function build(labels) {
     };
   }
 
+  const C = c => new THREE.Color(c);
+  const W0 = { hemi: C('#ffffff'), ground: C('#8f8f98'), sun: C('#ffffff'), fog: C('#0c0c0e') }, W1 = { hemi: C('#ffffff'), ground: C('#efe2cc'), sun: C('#fff2dc'), fog: C('#cfe4f5') };
   return {
     update, keys, R: 130,
+    // the colour rises out of the street, floor by floor, up past you into the sky; at the end it breaks up
+    // from the top down in soft patches
+    live: {
+      at: 0.56, soft: 3.0,
+      in: { dir: [0, 1, 0], radial: 0, min: -1, max: 42, noise: 3, dur: 3.5, pow: 1.1 },
+      out: { dir: [0, -0.35, 0], radial: 0, min: -10, max: 4.6, noise: 9, dur: 4.0, pow: 0.8 },
+      sun: [-0.43, 0.75, 0.57], groundY: -0.12,
+      motes: { n: 620, min: [-11.5, 12.3, -7.6], max: [11.5, 15.0, 7.6], size: 0.03 },
+    },
+    liveHook: (g) => {
+      hemi.color.copy(W0.hemi).lerp(W1.hemi, g); hemi.groundColor.copy(W0.ground).lerp(W1.ground, g);
+      sun.color.copy(W0.sun).lerp(W1.sun, g); sun.intensity = 1.9 + 0.6 * g;
+      scene.fog.color.copy(W0.fog).lerp(W1.fog, g);
+    },
+    // in: blinds open floor by floor; out: an iris closes on the studio
+    xfer: { in: { mode: 'blinds' }, out: { mode: 'iris', c: [0.5, 0.5] } },
+    // the camera rises up the stack on the way in; on the way out it cranes up towards level 4
+    camFx: (c, inU, outU) => {
+      if (inU > 0 && !c.pos) { c.t[1] -= 16 * inU; c.el -= 12 * inU; c.h *= 1 + 0.35 * inU; }
+      if (outU > 0 && c.pos) { c.pos[1] += 0.9 * outU; c.t[1] += 2.4 * outU; }
+    },
+    play: { dur: 58 },
+    // out of the studio the camera swirls up and away to the whole building on its block
+    swirl: { c: [0, 11, 0], pos: [36, 19, 32], look: [0, 12.2, 0], fov: 44, lift: 4 },
     // shadows arrive with the fills, so nothing casts a shadow before it has been drawn
     introHook: (T) => { sun.shadow.intensity = win(T, 3.3, 3.9); },
     colX: () => ctx.phone ? ctx.W - 100 : ctx.W * 0.73,

@@ -21,9 +21,29 @@ Sieben Schichten: Boden, Erdgeschoss, Obergeschoss, Verglasung, Fassade, Dachtra
 - **Eine Axonometrie ist ein langes Objektiv.** Die Zeichnung ist das echte 3D-Haus, gesehen durch ein 1,5°-Objektiv aus etwa 1,5 km Entfernung. Wird das Objektiv geweitet und der Bildausschnitt gehalten (Dolly-Zoom), laufen die Linien zusammen, und aus der Axonometrie wird eine Perspektive auf Augenhöhe.
 - **Die Schichten bewegen sich nach Ebene.** Bodenplatte, beide Geschosse, Sparren und Dach heben sich mit ihrer Ebene. Verglasung und Fassade gehören zu ihrem Geschoss und gleiten entlang ihrer eigenen Wand heraus. Landet eine Schicht, sinkt alles darüber mit.
 - **Der Plotter-Loader** ist eine Zeichenfront in jedem Material (`patchLine`, `patchFill` in `core.js`): Nichts jenseits der Front wird gezeichnet, und Linien nahe der Front erscheinen in Rot.
-- **Es bleibt eine Zeichnung.** Kanten sind Bildschirmlinien in drei Stärken, weiß auf dunklen Flächen. Die Flächen tragen prozedurale Maserung, Schalungsfugen, Stehfalze und Gewebe sowie gebackenes Licht. Keine Lichter, keine Schatten. Nur das Kaminfeuer bewegt sich von selbst.
+- **Es bleibt eine Zeichnung.** Kanten sind Bildschirmlinien in drei Stärken, weiß auf dunklen Flächen. Die Flächen tragen prozedurale Maserung, Schalungsfugen, Stehfalze und Gewebe sowie gebackenes Licht. Keine Lichter, keine Schatten. In der Zeichnung bewegt sich nur das Kaminfeuer von selbst.
 - **Der Rundgang** folgt einer weichen Kurve durch die Stationen statt gerader Strecken, mit einer Bildunterschrift an jeder Station. Der kleine Grundriss in der Ecke wechselt beim Hinaufgehen vom Erdgeschoss zum Obergeschoss.
 - **Nichts durchdringt sich.** Die Kamera hält auf dem ganzen Weg mindestens 40 cm Abstand zu jeder Fläche. Sparren, Dachpaneele und Firstblech sind am First lotrecht geschnitten statt ineinandergeschoben, und lange Kanten werden in kurze Stücke geteilt (`shortSegs` in `core.js`), damit keine Linie durch eine Wand scheint.
+
+## Farbe, Autoplay und Übergänge
+
+- **Die Farbe kommt an der Haustür.** Sobald die Kamera an der Tür steht, füllt sich das Bild in etwa 3,5 Sekunden mit Farbe: ein klarer blauer Himmel mit Wolken über den ganzen Bildschirm, helle Fassaden, helle Eiche, Salbeigrün und türkisfarbenes Glas, bewusst als Illustration und nicht als Rendering. In Variante A breitet sie sich vom Kamin aus, in B fällt sie durchs Ostfenster herein, in C steigt sie von der Straße auf. Eine schmale Front in Gletscher-Cyan führt sie an (`LIVE` in `core.js`).
+- **Am Ende geht es zurück vor das Haus.** Nach dem letzten Raum schwenkt die Kamera in einer Drehung hinaus vor die Fassade, und die Farbe zieht sich dabei zurück: in A vom First zum Boden, in B zurück durchs Fenster, in C in weichen Flecken von oben.
+- **Die Varianten laufen nacheinander.** Jede Variante spielt sich von selbst ab und verweilt an jeder Station. Am Ende zeichnet sich das Blatt zurück, ein Übergang schließt das Bild, und die nächste Variante beginnt: A, B, C und wieder A. Jede Variante hat ihren eigenen Übergang hinein und hinaus. Eigenes Scrollen übernimmt, die Taste `P` oder der Knopf unten links gibt die Steuerung zurück.
+
+## Dachaufbau in Variante A
+
+Solange die Schichten schweben, sind Dach und Dachtragwerk vermaßt, und eine Tafel nennt den Aufbau von außen nach innen:
+
+| mm | Schicht |
+|---|---|
+| 0,7 | Zink-Stehfalz schwarz, Falz 40, e 450 |
+| — | Strukturierte Trennlage |
+| 200 | Holzfaser-Dämmpaneel λ 0,040 |
+| 220 | Sparren KVH 80/220, e 600 |
+| 440 | Firstpfette BSH GL24h 160/440 |
+
+Dachneigung 40°, Überstand 500, Dachlänge 10 900.
 
 ## Farben
 
@@ -36,6 +56,7 @@ Schwarz, Weiß und Rot, in allen drei Varianten.
 | Tusche | `#f1eeea` | Linien, Schrift |
 | Weiß | `#e7e4df` | Polster, Steinplatten, Leuchten |
 | Rot | `#e5202e` | Stift, landende Schicht, Türrahmen, Akzente |
+| Gletscher-Cyan | `#43c4d2` | Maße, Farbfront, Autoplay, Übergänge |
 
 Die Varianten B und C sind beleuchtete Szenen. Dort stellt eine Farbkorrektur im Material (`patchFill`) alles auf neutrale Grautöne und lässt nur warme, satte Farben als Rot stehen.
 

@@ -9,6 +9,13 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,500;0,600;0,700;1,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="sketch.css">
+<script>
+  // arriving from the sheet before: start under its title card, so the hand-over has no seam
+  (function () {
+    var q = new URLSearchParams(location.search);
+    if (q.has('chain')) document.documentElement.classList.add('chain');
+  })();
+</script>
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
@@ -26,6 +33,7 @@
 </div>
 <svg id="leaders"></svg>
 <div id="labels"></div>
+<div id="dims" aria-hidden="true"></div>
 <div id="ui">
   <header class="top">
     <div class="brand">
@@ -75,7 +83,10 @@
     </div>
   </div>
   <footer class="bottom">
-    <span class="hint-wrap"><i class="hint-dot"></i><span id="hint"></span></span>
+    <span class="bl">
+      <button type="button" class="play" id="play" aria-pressed="false" title="Abspielen oder anhalten (P)"><i></i><span>Abspielen</span></button>
+      <span class="hint-wrap"><i class="hint-dot"></i><span id="hint"></span></span>
+    </span>
     <span class="cam-readout" id="camReadout">PROJ // 1.5° AXO</span>
     <span id="counter"></span>
   </footer>
@@ -86,6 +97,18 @@
   <i><b id="lbar"></b></i>
 </div>
 <div id="fade"></div>
+<div id="xfer" aria-hidden="true">
+  <span class="xk">three.js Demo 1 · Blatt</span>
+  <span class="xn" id="xferNo"></span>
+  <span class="xt" id="xferName"></span>
+</div>
+<script>
+  (function () {
+    var d = (new URLSearchParams(location.search).get('dir') || 'a').toLowerCase();
+    var s = { a: ['01', 'Planblatt'], b: ['02', 'Abwicklung'], c: ['03', 'Geschossweise'] }[d] || ['01', 'Planblatt'];
+    document.getElementById('xferNo').textContent = s[0]; document.getElementById('xferName').textContent = s[1];
+  })();
+</script>
 <div id="scroll"></div>
 <script type="module" src="main.js"></script>
 </body>

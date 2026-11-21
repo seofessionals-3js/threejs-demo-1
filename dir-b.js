@@ -6,7 +6,7 @@
 // the two near walls drop, and the room stands there as a cutaway model.
 import {
   THREE, Part, bx, cyl, ball, beam, panel, M, V, clamp, lerp, ease, win,
-  scene, renderer, camera, lineMat, stdMat, eyeKey, canvasTex, rng, DRAW, patchFill, INK, segs,
+  scene, renderer, camera, lineMat, stdMat, eyeKey, canvasTex, rng, DRAW, patchFill, INK, segs, low, high, TEXK,
 } from './core.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
@@ -15,7 +15,7 @@ const NZ = -OZ - H;                           // where the top of the window wal
 // a soft box: cushions, upholstery
 function rb(x0, y0, z0, x1, y1, z1, r = 0.04) {
   const w = Math.abs(x1 - x0), h = Math.abs(y1 - y0), d = Math.abs(z1 - z0);
-  const g = new RoundedBoxGeometry(w, h, d, 4, Math.min(r, Math.min(w, h, d) / 2 - 0.002));
+  const g = new RoundedBoxGeometry(w, h, d, low && r >= 0.03 ? 3 : 4, Math.min(r, Math.min(w, h, d) / 2 - 0.002));
   g.translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); return g;
 }
 // turn a piece about a point
@@ -66,7 +66,9 @@ function blooms(part, x, y0, z, h, n, key = 'bloom', seed = 3) {
 }
 
 export async function build(labels) {
-  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  // the shadow map is only redrawn when a wall, the door or the sun has moved (shadowKey below)
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = low ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+  renderer.shadowMap.autoUpdate = false;
   const hemi = new THREE.HemisphereLight('#ffffff', '#8f8f98', 2.3); scene.add(hemi);
   // a pendant over the middle of the room while you are inside
   const lamp = new THREE.SpotLight('#fff3e6', 0, 4.4, 0.7, 0.35, 1.2);
@@ -80,7 +82,7 @@ export async function build(labels) {
   const SUN_C = V(7.5, 17, -4.5);   // high and soft: both walls of the cutaway read bright, as in a studio render
   let swK = 0;
   const sun = new THREE.DirectionalLight('#ffffff', 2.6);
-  sun.position.copy(SUN_A); sun.castShadow = true; sun.shadow.mapSize.set(4096, 4096);
+  sun.position.copy(SUN_A); sun.castShadow = true; sun.shadow.mapSize.setScalar(high ? 4096 : 2048);
   Object.assign(sun.shadow.camera, { left: -13, right: 13, top: 13, bottom: -13, near: 1, far: 45 });
   sun.shadow.bias = -0.0003; sun.shadow.normalBias = 0.025; sun.shadow.radius = 3; sun.target.position.set(0, 0, -1.5);
   scene.add(sun, sun.target);
@@ -91,8 +93,9 @@ export async function build(labels) {
   studio.position.y = -0.13; studio.renderOrder = -5; scene.add(studio);
 
   const T = buildTextures();
-  const art = (map) => ({ mat: stdMat('#ffffff', { map, bumpMap: T.fabricBump, bumpScale: 0.006, rough: 0.8, flat: 0.7 }) });
-  const book = (c) => ({ mat: stdMat(c, { rough: 0.7 }), w: 'mid' });
+  // prints flat on the wall and the books on their shelves throw no shadow worth drawing
+  const art = (map) => ({ mat: stdMat('#ffffff', { map, bumpMap: T.fabricBump, bumpScale: 0.006, rough: 0.8, flat: 0.7 }), cast: false });
+  const book = (c) => ({ mat: stdMat(c, { rough: 0.7 }), w: 'mid', cast: false });
   const PAL = {
     plaster: { mat: stdMat('#2b2b30', { real: '#eceae6', rough: 0.92, map: T.plaster, bumpMap: T.plasterBump, bumpScale: 0.004, flat: 0.75 }), uvScale: 0.35 },
     ceiling: { mat: stdMat('#303035', { real: '#d2cec8', rough: 0.92, map: T.plaster, bumpMap: T.plasterBump, bumpScale: 0.003, emissive: '#1c1c20', emissiveIntensity: 0.22, flat: 0.75 }), uvScale: 0.35 },
@@ -400,7 +403,7 @@ export async function build(labels) {
     lid: [[LX + 0.2, NZ - lz - 0.2, 'PD-06']],
   };
   update(0); scene.updateMatrixWorld(true);
-  const SH = { x0: -8.6, z0: -11.6, w: 17.2, d: 18.4, s: 150 };
+  const SH = { x0: -8.6, z0: -11.6, w: 17.2, d: 18.4, s: 150 };     // the sheet at 150 px per metre (canvasTex halves it on a phone)
   const dots = Object.values(CODE).flat(), pend = [LX, NZ - lz];
   const panelTex = drawSheet(SH, 'panel', dots, pend), groundTex = drawSheet(SH, 'ground', dots, pend);
   const decalMat = (map, a, b) => { const m = patchFill(new THREE.MeshBasicMaterial({ map, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }), { wash: false }); sheets.push([m, a, b]); return m; };
@@ -475,6 +478,8 @@ export async function build(labels) {
   const W0 = { hemi: C('#ffffff'), ground: C('#8f8f98'), sun: C('#ffffff'), sh: C('#000000') }, W1 = { hemi: C('#ffffff'), ground: C('#dedcd9'), sun: C('#fff4e4'), sh: C('#5a7f96') };
   return {
     update, keys, R: 40,
+    // what can move a shadow: the folding and growing (0.06 to 0.56), the sun coming round, the door, the cutaway
+    shadowKey: (p, sw) => `${clamp(p, 0.06, 0.85).toFixed(4)}|${sw.toFixed(3)}`,
     // daylight pours in through the window and fills the room, the box and the studio floor around it;
     // at the end it leaves the way it came, back out through the window
     live: {

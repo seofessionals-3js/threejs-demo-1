@@ -1,4 +1,4 @@
-import { THREE, renderer, scene, camera, ctx, camAt, applyCam, resize, Labels, clamp, lerp, ease, easeOut, win, DRAW, LIVE, ENV, FX, Dims, motes } from './core.js';
+import { THREE, renderer, scene, camera, ctx, camAt, applyCam, resize, Labels, clamp, lerp, ease, easeOut, win, DRAW, LIVE, ENV, FX, Dims, motes, dom, fxMesh, pace, holdPace, visible } from './core.js';
 
 if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 const Q = new URLSearchParams(location.search);
@@ -41,7 +41,14 @@ $('h1').innerHTML = C.h1.split('<br>').map(l => `<span class="ln"><span>${l}</sp
 $('spec').innerHTML = (C.spec || []).map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('');
 $('hint').textContent = C.hint;
 document.title = C.title || document.title;
-addEventListener('resize', resize);
+// the scroll range is measured once per layout and against the canvas (the tallest the window gets on a phone),
+// so the end of the sheet can always be reached and nothing is read from the layout inside a frame
+let scrollMax = 1;
+const measure = () => { resize(); scrollMax = Math.max(1, document.documentElement.scrollHeight - ctx.H); };
+measure();
+addEventListener('resize', measure, { passive: true });
+new ResizeObserver(measure).observe(renderer.domElement);
+document.addEventListener('visibilitychange', () => { ctx.dirty = true; });
 
 // ---- the colour: where it comes from, where it goes, and the light it brings
 const LV = S.live || { at: 2, in: { dir: [0, 0, 0], min: 0, max: 1, dur: 1 }, out: { dir: [0, 0, 0], min: 0, max: 1, dur: 1 } };
@@ -72,12 +79,12 @@ function liveStep(dt, want) {
   LIVE.uOutF.value = lerp(LV.out.min - pad, LV.out.max + pad, Math.pow(live.b, LV.out.pow ?? 0.6));
   LIVE.uLive.value = clamp(live.a * 2.5) * (1 - clamp(live.b * 1.25));
 }
-const target = () => clamp(scrollY / Math.max(1, document.documentElement.scrollHeight - innerHeight));
+const target = () => clamp(scrollY / scrollMax);
 
 // ---- interactive CAD mini-radar (#cad-map)
 const cadMap = $('cad-map'), cmLbl = $('cm-lbl'), cmScale = $('cm-scale');
 const cmSvg = $('cm-svg'), cmZonesG = $('cm-zones'), cmPlan = $('cm-plan'), cmCone = $('cm-cone'), cmDot = $('cm-dot'), cmStops = $('cm-stops');
-let hoverTag = '';
+let hoverTag = '', cmStopEls = [];
 if (S.radar && cadMap) {
   const R = S.radar;
   if (R.scale && cmScale) cmScale.textContent = R.scale;
@@ -102,8 +109,7 @@ if (S.radar && cadMap) {
   }
 }
 function jumpToP(targetP, smooth = true) {
-  const maxScroll = Math.max(1, document.documentElement.scrollHeight - innerHeight);
-  window.scrollTo({ top: clamp(targetP, 0, 1) * maxScroll, behavior: smooth ? 'smooth' : 'auto' });
+  window.scrollTo({ top: clamp(targetP, 0, 1) * scrollMax, behavior: smooth ? 'smooth' : 'auto' });
 }
 window.__jumpTo = (stopOrP, smooth = true) => {
   if (typeof stopOrP === 'number') { jumpToP(stopOrP, smooth); return stopOrP; }
@@ -112,9 +118,10 @@ window.__jumpTo = (stopOrP, smooth = true) => {
   return null;
 };
 if (cadMap) {
+  cmStopEls = [...cadMap.querySelectorAll('[data-stop]')];
   cadMap.querySelectorAll('[data-p]').forEach(el => {
-    el.addEventListener('mouseenter', () => { hoverTag = el.dataset.tag || ''; });
-    el.addEventListener('mouseleave', () => { hoverTag = ''; });
+    el.addEventListener('mouseenter', () => { hoverTag = el.dataset.tag || ''; ctx.dirty = true; });
+    el.addEventListener('mouseleave', () => { hoverTag = ''; ctx.dirty = true; });
     el.addEventListener('click', e => { e.stopPropagation(); setPlaying(false); jumpToP(parseFloat(el.dataset.p)); });
   });
 }
@@ -126,9 +133,9 @@ let playing = !LIVEONLY && (Q.has('play') ? Q.get('play') !== '0' : !REDUCED);
 let playP = 0;
 const INTRO_END = S.introEnd ?? 4.0;
 const PACE = [...(S.radar?.stops || []).map(s => s.p), LV.at].filter(v => v > 0.04 && v < 0.985);
-const pace = pp => PACE.reduce((k, s) => Math.min(k, 1 - 0.66 * Math.exp(-Math.pow((pp - s) / 0.016, 2))), 1);
+const pacing = pp => PACE.reduce((k, s) => Math.min(k, 1 - 0.66 * Math.exp(-Math.pow((pp - s) / 0.016, 2))), 1);
 function setPlaying(v) {
-  playing = v && !LIVEONLY;
+  playing = v && !LIVEONLY; ctx.dirty = true;
   if (playing) playP = target();
   if (playBtn) {
     playBtn.classList.toggle('on', playing);
@@ -198,47 +205,55 @@ DRAW.uDrawDir.value.set(D.dir[0], D.dir[1], D.dir[2], D.radial || 0);
 DRAW.uDrawC.value.set(...(D.c || [0, 0, 0]));
 DRAW.uDrawSoft.value = D.soft || 1.2;
 const lines = [...document.querySelectorAll('#h1 .ln > span')];
+const EL = Object.fromEntries(['fade', 'loader', 'ltext', 'lbar', 'cad-frame', 'kicker', 'lede', 'spec', 'hero', 'counter', 'legend', 'hint', 'camReadout', 'caption'].map(id => [id, $(id)]));
+EL.top = document.querySelector('.top'); EL.bottom = document.querySelector('.bottom'); EL.hintWrap = document.querySelector('.hint-wrap');
+// when the last piece of the page has arrived (the labels come in one after another), the intro has nothing left to write
+const INTRO_DONE = 3.45 + labels.items.reduce((m, it, i) => Math.max(m, it.order ?? i), 0) * 0.11 + 0.6;
+const labOn = () => 1;
+let introOver = false;
 function intro(T) {
+  if (introOver) return labOn;
   const sm = x => x * x * (3 - 2 * x);
   const plot = sm(win(T, 0.35, 3.0)), fill = sm(win(T, 0.8, 3.35));
   const span = D.max - D.min + 2;
   DRAW.uDraw.value = T > 3.6 ? 1e5 : D.min - 1 + plot * (span + DRAW.uDrawSoft.value);
   DRAW.uDrawFill.value = T > 3.6 ? 1e5 : D.min - 1 + fill * span;
-  $('fade').style.opacity = 1 - win(T, 0, 0.7);
+  dom.op(EL.fade, 1 - win(T, 0, 0.7));
   const lo = 1 - win(T, 3.15, 3.55);
-  $('loader').style.opacity = lo * win(T, 0.2, 0.5);
-  $('ltext').textContent = `${C.loader} · ${String(Math.round(plot * 100)).padStart(3, '0')}%`;
-  $('lbar').style.transform = `scaleX(${plot})`;
+  dom.op(EL.loader, lo * win(T, 0.2, 0.5));
+  dom.text(EL.ltext, `${C.loader} · ${String(Math.round(plot * 100)).padStart(3, '0')}%`);
+  dom.sty(EL.lbar, 'transform', `scaleX(${plot.toFixed(3)})`);
   const o = (a, d = 0.5) => win(T, a, a + d);
-  if ($('cad-frame')) $('cad-frame').style.opacity = o(1.8, 0.7);
-  document.querySelector('.top').style.opacity = o(2.2, 0.6);
-  $('kicker').style.opacity = o(2.5);
+  if (EL['cad-frame']) dom.op(EL['cad-frame'], o(1.8, 0.7));
+  dom.op(EL.top, o(2.2, 0.6));
+  dom.op(EL.kicker, o(2.5));
   lines.forEach((l, i) => {
     const u = easeOut(win(T, 2.65 + i * 0.12, 3.45 + i * 0.12));
-    l.style.transform = `translateY(${(1 - u) * 125}%)`;
-    l.style.opacity = u > 0.005 ? '1' : '0';
+    dom.sty(l, 'transform', `translateY(${((1 - u) * 125).toFixed(2)}%)`);
+    dom.sty(l, 'opacity', u > 0.005 ? '1' : '0');
   });
-  $('lede').style.opacity = o(3.25); $('lede').style.transform = `translateY(${(1 - easeOut(o(3.25, 0.7))) * 14}px)`;
-  $('spec').style.opacity = o(3.45);
+  dom.op(EL.lede, o(3.25)); dom.sty(EL.lede, 'transform', `translateY(${((1 - easeOut(o(3.25, 0.7))) * 14).toFixed(2)}px)`);
+  dom.op(EL.spec, o(3.45));
   if (cadMap) {
     const cmOp = o(3.55, 0.55);
-    cadMap.style.opacity = cmOp;
-    cadMap.classList.toggle('interactive', cmOp > 0.25);
+    dom.op(cadMap, cmOp);
+    dom.cls(cadMap, 'interactive', cmOp > 0.25);
   }
-  document.querySelector('.bottom').style.opacity = o(3.7);
+  dom.op(EL.bottom, o(3.7));
   // arriving from the sheet before: its title card lifts and this sheet's own way in opens the picture
   if (CHAIN && X.in) {
     FX.uMode.value = MODES[X.in.mode] || 1; FX.uT.value = 1 - easeOut(win(T, 0.25, 1.65));
     if (X.in.dir) FX.uDir.value.set(...X.in.dir); if (X.in.c) FX.uC.value.set(...X.in.c);
-    xfer.style.opacity = 1 - win(T, 0.15, 0.75);
+    dom.op(xfer, 1 - win(T, 0.15, 0.75));
   }
-  S.introHook?.(T);
+  if (T > INTRO_DONE) introOver = true;
   return (i) => o(3.0 + i * 0.11, 0.35);
 }
 
 let p = FIXED ?? 0, T = T_FIXED ?? 0, frames = 0, lastNow = performance.now(), dt = 0;
 const t0 = performance.now();
-let wantLive = false;
+let wantLive = false, swStill = null, shadowKey = null;
+const SHADOWS = () => renderer.shadowMap.enabled;
 function step() {
   // the colour comes in once the sheet reaches its moment and stays until the hand-over drains it
   const draining = endT >= 0 && endT >= DRAIN_AT();
@@ -256,10 +271,11 @@ function step() {
   LIVE.uSunDir.value.set(SUN0.x * Math.cos(sw) - SUN0.z * Math.sin(sw), SUN0.y, SUN0.x * Math.sin(sw) + SUN0.z * Math.cos(sw));
   S.liveHook?.(LIVE.uLive.value, T);
 
-  const swU = LIVEONLY && Q.has('swirl') && SW ? parseFloat(Q.get('swirl')) : swirlU();   // stills can freeze the swirl
+  const swU = swStill != null ? swStill : LIVEONLY && Q.has('swirl') && SW ? parseFloat(Q.get('swirl')) : swirlU();   // stills can freeze the swirl
   const st = S.update(p, T, swU) || {};
   const lab = intro(T);
-  labels.items.forEach((it, i) => { it.op *= lab(it.order ?? i); });
+  S.introHook?.(T);
+  if (lab !== labOn) labels.items.forEach((it, i) => { it.op *= lab(it.order ?? i); });
   const camState = camAt(S.keys, p);
   const inU = 1 - easeOut(win(T, 0.05, 3.7)), outU = outT >= 0 ? ease(win(outT, 0, OUT_DUR)) : 0;
   if (swU > 0) swirl(camState, swU);
@@ -270,23 +286,22 @@ function step() {
   if (scene.fog) { const D = camera.userData.D; scene.fog.near = D + (S.fog?.[0] ?? 60); scene.fog.far = D + (S.fog?.[1] ?? 340); }
   labels.update(S.colX || (() => ctx.W * 0.7));
   dims.update();
-  const hero = $('hero'); const ho = st.hero ?? 1;
-  hero.style.opacity = ho; hero.style.transform = `translateY(${(1 - ho) * -20}px)`;
-  $('counter').innerHTML = st.counter || '';
-  $('legend').innerHTML = st.legend || ''; $('legend').style.opacity = st.legendOp ?? 0;
+  const ho = st.hero ?? 1;
+  dom.op(EL.hero, ho); dom.sty(EL.hero, 'transform', `translateY(${((1 - ho) * -20).toFixed(1)}px)`);
+  dom.html(EL.counter, st.counter || '');
+  dom.html(EL.legend, st.legend || ''); dom.op(EL.legend, st.legendOp ?? 0);
   let hint = st.hint ?? C.hint;
   if (endT >= 0 && outT < 0) hint = goTo.href ? `Weiter: Demo 2 · ${goTo.sub}` : `Weiter: ${goTo.no} · ${goTo.name}`;
   else if (playing && T > INTRO_END && hint) hint = 'Läuft von selbst · Scrollen übernimmt';
-  if ($('hint').textContent !== hint) $('hint').textContent = hint;
-  const hw = document.querySelector('.hint-wrap');
-  if (hw) hw.style.opacity = hint ? '1' : '0';
-  if (activeLink) activeLink.style.setProperty('--prog', p.toFixed(4));
-  const cr = $('camReadout');
-  if (cr) {
+  dom.text(EL.hint, hint);
+  if (EL.hintWrap) dom.sty(EL.hintWrap, 'opacity', hint ? '1' : '0');
+  if (activeLink) { const pr = p.toFixed(3); if (activeLink._pr !== pr) { activeLink._pr = pr; activeLink.style.setProperty('--prog', pr); } }
+  const cr = EL.camReadout;
+  if (cr && !ctx.phone) {
     const fov = camState.fov;
     const mode = fov < 6 ? 'PARALLEL-AXO' : fov < 28 ? 'ÜBERGANG' : 'PERSP. AUGENHÖHE';
     const pct = String(Math.round(p * 100)).padStart(3, '0');
-    cr.innerHTML = `PROJ <b>${mode}</b> (${fov.toFixed(1)}°) &nbsp;//&nbsp; SEQ <b>${pct}%</b>`;
+    dom.html(cr, `PROJ <b>${mode}</b> (${fov.toFixed(1)}°) &nbsp;//&nbsp; SEQ <b>${pct}%</b>`);
   }
   if (cadMap) {
     const R = S.radar || {};
@@ -294,51 +309,64 @@ function step() {
     const isPersp = camState.fov >= 18;
     const cx = isPersp ? clamp(camera.position.x, clampX[0], clampX[1]) : (R.axoDot?.[0] ?? 6.5);
     const cz = isPersp ? clamp(camera.position.z, clampZ[0], clampZ[1]) : (R.axoDot?.[1] ?? 2.6);
-    if (cmDot) { cmDot.setAttribute('cx', cx.toFixed(2)); cmDot.setAttribute('cy', cz.toFixed(2)); }
+    if (cmDot) { dom.attr(cmDot, 'cx', cx.toFixed(2)); dom.attr(cmDot, 'cy', cz.toFixed(2)); }
     if (cmCone) {
       const tx = camState.t[0], tz = camState.t[2];
       const ang = isPersp ? Math.atan2(tz - camera.position.z, tx - camera.position.x) : (R.axoAng ?? -2.35);
       const rad = R.coneLen ?? 3.2, sp = 0.42;
       const x1 = cx + Math.cos(ang - sp) * rad, z1 = cz + Math.sin(ang - sp) * rad;
       const x2 = cx + Math.cos(ang + sp) * rad, z2 = cz + Math.sin(ang + sp) * rad;
-      cmCone.setAttribute('points', `${cx.toFixed(2)},${cz.toFixed(2)} ${x1.toFixed(2)},${z1.toFixed(2)} ${x2.toFixed(2)},${z2.toFixed(2)}`);
+      dom.attr(cmCone, 'points', `${cx.toFixed(2)},${cz.toFixed(2)} ${x1.toFixed(2)},${z1.toFixed(2)} ${x2.toFixed(2)},${z2.toFixed(2)}`);
     }
     if (cmLbl) {
-      cmLbl.textContent = hoverTag
+      dom.text(cmLbl, hoverTag
         ? `SPRUNG // ${hoverTag}`
         : st.radarLbl || (isPersp
           ? `POS X:${camera.position.x.toFixed(1)} Y:${camera.position.y.toFixed(1)}M`
-          : `AXO // ${String(Math.round(p * 100)).padStart(3, '0')}%`);
+          : `AXO // ${String(Math.round(p * 100)).padStart(3, '0')}%`));
     }
     const activeStop = st.stop || '';
-    cadMap.querySelectorAll('[data-stop]').forEach(el => {
-      el.classList.toggle('active', el.dataset.stop === activeStop);
-    });
+    for (const el of cmStopEls) dom.cls(el, 'active', el.dataset.stop === activeStop);
   }
-  const cap = $('caption'); cap.style.opacity = (st.capOp || 0) * (1 - clamp(swU * 3)); if (st.cap && cap.dataset.k !== st.cap) { cap.dataset.k = st.cap; cap.innerHTML = st.cap; }
+  const cap = EL.caption; dom.op(cap, (st.capOp || 0) * (1 - clamp(swU * 3))); if (st.cap && cap.dataset.k !== st.cap) { cap.dataset.k = st.cap; cap.innerHTML = st.cap; }
 
   // the way out: the page chrome steps back, the drawing un-plots itself, this sheet's cover closes, the
   // title of the next sheet comes up, and the next sheet loads under it
   if (outT >= 0) {
     const ui = 1 - win(outT, 0, 0.4);
-    for (const el of uiEls) el.style.opacity = ui;
+    for (const el of uiEls) dom.op(el, ui);
     const span = D.max - D.min + 2;
     DRAW.uDrawFill.value = D.min - 1 + (1 - ease(win(outT, 0.05, 0.75))) * (span + 1);
     DRAW.uDraw.value = D.min - 1 + (1 - ease(win(outT, 0.25, 1.1))) * (span + DRAW.uDrawSoft.value + 1);
     FX.uMode.value = MODES[X.out?.mode] || 4; FX.uT.value = ease(win(outT, 0.6, 1.35));
     if (X.out?.dir) FX.uDir.value.set(...X.out.dir);
     if (X.out?.c) FX.uC.value.set(...X.out.c);
-    setXfer(goTo); xfer.style.opacity = win(outT, 1.25, 1.6);
+    setXfer(goTo); dom.op(xfer, win(outT, 1.25, 1.6));
   }
   FX.uAspect.value = ctx.W / ctx.H; FX.uFxTime.value = T;
+  fxMesh.visible = FX.uT.value > 0.0001;                       // the cover is only drawn while it covers something
+  // shadows are redrawn only when something that casts one has moved (the sheet tells us through shadowKey)
+  if (SHADOWS()) {
+    const k = S.shadowKey ? S.shadowKey(p, swU, T) : `${p.toFixed(4)}|${swU.toFixed(3)}`;
+    if (k !== shadowKey || frames < 4) { shadowKey = k; renderer.shadowMap.needsUpdate = true; }
+  }
   renderer.render(scene, camera);
+  lastDrawn = performance.now(); pDrawn = p;
 }
+
+// ---- the loop. A frame is only drawn when something on the sheet changed: the scroll, the intro, the colour
+// coming or going, the hand-over. A sheet at rest in colour (clouds, leaves, dust) is drawn at half the rate,
+// a sheet at rest as a drawing only as often as its fire flickers, or not at all. A hidden page draws nothing.
+let lastDrawn = 0, pDrawn = -1;
+const AMBIENT_MS = 1000 / 31, REST_MS = S.restFps ? 1000 / S.restFps : Infinity;
 function frame(now = performance.now(), loop = true) {
+  if (loop) requestAnimationFrame(frame);
   dt = Math.min(0.05, Math.max(0, (now - lastNow) / 1000)); lastNow = now;
   if (T_FIXED == null) T = (now - t0) / 1000;
+  if (loop && !visible()) { pace(now, false); return; }
   if (!LIVEONLY) {
     if (playing && T > INTRO_END && endT < 0) {
-      playP = Math.min(1, playP + dt / (S.play?.dur ?? 70) * pace(playP));
+      playP = Math.min(1, playP + dt / (S.play?.dur ?? 70) * pacing(playP));
       jumpToP(playP, false);
     }
     // the end of the sheet: hold a moment, drain the colour, then hand over
@@ -356,10 +384,28 @@ function frame(now = performance.now(), loop = true) {
     }
     if (outT >= 0) { outT += dt; if (outT > OUT_DUR + 0.1) go(); }
   }
-  if (FIXED == null) p += (target() - p) * 0.12;
+  if (FIXED == null) {
+    const tg = target();
+    // the same easing whatever the frame rate (0.12 of the way per 60 Hz frame)
+    p += (tg - p) * (loop ? 1 - Math.pow(0.88, dt * 60) : 0.12);
+    if (Math.abs(tg - p) < 2e-5) p = tg;
+  }
+  let draw = true, full = true;
+  if (loop) {
+    const wl = wantLive ? p >= LV.at - 0.03 : p >= LV.at;         // what step() will decide about the colour
+    const busy = frames < 4 || ctx.dirty || !introOver || T < INTRO_END + 0.3 || p !== pDrawn || endT >= 0 || outT >= 0
+      || wl !== wantLive || (wantLive && live.state === 'off') || (live.state === 'in' && (live.a < 1 || live.b > 0 || !wantLive));
+    if (!busy) {
+      full = false;
+      const every = LIVE.uLive.value > 0.001 ? AMBIENT_MS : REST_MS;
+      draw = now - lastDrawn >= every - 2;
+    }
+  }
+  pace(now, draw && full);
+  if (!draw) return;
+  ctx.dirty = false;
   step();
   if (++frames === 3) window.__ready = true;
-  if (loop) requestAnimationFrame(t => frame(t));
 }
 // for checking the timeline without watching it: run the page clock forward by some seconds
 window.__advance = (sec, fps = 30) => {
@@ -368,5 +414,6 @@ window.__advance = (sec, fps = 30) => {
 };
 window.__S = S;
 window.__live = live;
-window.__frame = (t, pp) => { T = t; p = pp; step(); return true; };
+window.__frame = (t, pp, o) => { T = t; p = pp; swStill = o?.swirl ?? null; step(); return true; };
+holdPace(2500);
 if (DRIVE) { step(); window.__ready = true; } else requestAnimationFrame(frame);

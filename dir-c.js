@@ -3,7 +3,7 @@
 // float, and level 4 lowers onto its columns over your head.
 import {
   THREE, Part, bx, beam, cyl, ball, panel, M, V, D2R, clamp, lerp, ease, easeOut, win, segs,
-  scene, renderer, lineMat, stdMat, toneMat, liveLine, eyeKey, rng, ctx, ACCENT, INK, boxUV, canvasTex,
+  scene, renderer, lineMat, stdMat, toneMat, liveLine, eyeKey, rng, ctx, ACCENT, INK, boxUV, canvasTex, low, high,
 } from './core.js';
 
 const BX = 12, BZ = 8;                         // half footprint
@@ -12,10 +12,12 @@ const COLX = [-10.8, -5.4, 0, 5.4, 10.8], COLZ = [-6.6, -2.2, 2.2, 6.6];
 const CORE = [6.4, -7.4, 11.4, -3.2];          // x0, z0, x1, z1: the north-east corner, where the axo can see it
 
 export async function build(labels) {
-  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  // the shadow map is only redrawn while a storey is on its way down (shadowKey below)
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = low ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+  renderer.shadowMap.autoUpdate = false;
   const hemi = new THREE.HemisphereLight('#ffffff', '#8f8f98', 2.0); scene.add(hemi, new THREE.AmbientLight('#ffffff', 0.4));
   const sun = new THREE.DirectionalLight('#ffffff', 1.9);
-  sun.position.set(-30, 52, 40); sun.castShadow = true; sun.shadow.mapSize.set(4096, 4096);
+  sun.position.set(-30, 52, 40); sun.castShadow = true; sun.shadow.mapSize.setScalar(high ? 4096 : 2048);
   Object.assign(sun.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 5, far: 160 });
   sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.04; sun.target.position.set(0, 10, 0);
   scene.add(sun, sun.target);
@@ -268,6 +270,8 @@ export async function build(labels) {
   const W0 = { hemi: C('#ffffff'), ground: C('#8f8f98'), sun: C('#ffffff'), fog: C('#0c0c0e') }, W1 = { hemi: C('#ffffff'), ground: C('#efe2cc'), sun: C('#fff2dc'), fog: C('#cfe4f5') };
   return {
     update, keys, R: 130,
+    // the storeys move while they land (0.06 to 0.30 and 0.70 to 0.90); in between every shadow stands still
+    shadowKey: (p) => (p < 0.3 ? Math.max(p, 0.06) : p < 0.7 ? 0.3 : Math.min(p, 0.9)).toFixed(4),
     // the colour rises out of the street, floor by floor, up past you into the sky; at the end it breaks up
     // from the top down in soft patches
     live: {

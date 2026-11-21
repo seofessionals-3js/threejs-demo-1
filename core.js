@@ -5,7 +5,9 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
+import { tier, low, high, governor, setArea, pinnedDpr, visible } from './quality.js';
 export { THREE, LineSegments2, LineSegmentsGeometry };
+export { tier, low, high, visible };
 
 export const D2R = Math.PI / 180;
 export const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
@@ -23,7 +25,11 @@ export const ACCENT = '#e5202e';
 export const ACCENT_HI = '#ff4d57';
 export const ACCENT2 = '#43c4d2';
 
-export const ctx = { W: innerWidth, H: innerHeight, res: new THREE.Vector2(innerWidth, innerHeight), lineMats: new Set(), shadows: false, phone: innerWidth < 700 };
+// W, H: the canvas in CSS pixels (not the window: on a phone the canvas keeps its size while the URL bar slides).
+// dpr: the resolution the governor has chosen. rev counts real resizes, for things that cache a layout.
+export const ctx = { W: innerWidth, H: innerHeight, res: new THREE.Vector2(innerWidth, innerHeight), lineMats: new Set(), shadows: false, phone: innerWidth < 700, dpr: 1, rev: 0, dirty: true };
+// what the phone tier leaves out: textures at half size, lighter filtering
+export const TEXK = low ? 0.5 : 1, ANISO = low ? 4 : 8;
 
 // ---------- the plotter. Everything is drawn in by a front that sweeps through the model: lines first
 // (with an orange pen tip), then the fills behind them. order = dot(world, dir) + radial * distance from c.
@@ -153,8 +159,13 @@ function patchLine(m, o = {}) {
 }
 export { patchFill };
 
-export const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('c'), antialias: true, preserveDrawingBuffer: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+// stills and recordings (?p, ?drive) read the canvas back and keep the device's resolution; the live page lets
+// the governor choose it
+const QS = new URLSearchParams(location.search);
+export const REC = QS.has('p') || QS.has('drive');
+const canvasEl = document.getElementById('c');
+export const renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true, preserveDrawingBuffer: REC, powerPreference: 'high-performance', stencil: false });
+renderer.setPixelRatio(1);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 export const scene = new THREE.Scene();
 scene.background = new THREE.Color(PAPER);
@@ -222,6 +233,9 @@ export const M = {
 };
 
 // ---------- materials
+// Line widths are CSS pixels. A phone draws them a little finer, but never thinner than about 0.8 of a pixel
+// of the buffer, or the fine lines break up when the resolution steps down.
+function fitLine(m) { m.linewidth = Math.max(m.userData.w * (ctx.phone ? 0.72 : 1), 0.8 / ctx.dpr); }
 export function lineMat(o = {}) {
   const m = new LineMaterial({
     color: new THREE.Color(o.color ?? INK), linewidth: o.w ?? 1, dashed: !!o.dashed,
@@ -229,7 +243,7 @@ export function lineMat(o = {}) {
     depthTest: o.depthTest ?? true, depthWrite: false,
   });
   m.userData.w = o.w ?? 1; m.resolution.copy(ctx.res); ctx.lineMats.add(m);
-  if (ctx.phone) m.linewidth = m.userData.w * 0.72;
+  fitLine(m);
   return patchLine(m, o);
 }
 // The drawing's own shading: directional sun + cool sky fill + procedural local-space architectural texture
@@ -370,7 +384,7 @@ export function toneMat(hex, o = {}) {
 export function stdMat(hex, o = {}) {
   const m = new THREE.MeshStandardMaterial({
     color: hex, roughness: o.rough ?? 0.82, metalness: o.metal ?? 0, map: o.map ?? null,
-    bumpMap: o.bumpMap ?? null, bumpScale: o.bumpScale ?? 0.016,
+    bumpMap: low ? null : (o.bumpMap ?? null), bumpScale: o.bumpScale ?? 0.016,      // a phone does without the fine relief
     roughnessMap: o.roughnessMap ?? null,
     envMap: o.envMap ?? ensureEnv(), envMapIntensity: o.env ?? 0.42,
     transparent: o.opacity != null, opacity: o.opacity ?? 1, depthWrite: o.opacity == null,
@@ -380,8 +394,12 @@ export function stdMat(hex, o = {}) {
   return patchFill(m, o);
 }
 // silhouettes for round things: the back faces pushed out a fixed number of pixels
+const HULLS = new Map();
 export function hullMat(px = 1, color = INK) {
+  const hk = px + '|' + color;
+  if (HULLS.has(hk)) return HULLS.get(hk);
   const m = new THREE.MeshBasicMaterial({ color, side: THREE.BackSide });
+  HULLS.set(hk, m);
   m.onBeforeCompile = s => {
     s.uniforms.uPx = { value: px }; s.uniforms.uRes = { value: ctx.res }; addDraw(s); addLive(s);
     s.fragmentShader = DRAW_GLSL + LIVE_GLSL + s.fragmentShader
@@ -398,18 +416,33 @@ export function hullMat(px = 1, color = INK) {
 // Long edges are cut into short runs. A segment that reaches behind the camera is trimmed at the near plane,
 // and a very long one loses its depth there: it then shows through walls and ceilings as a stray line.
 export function shortSegs(arr, max = 0.9) {
-  const out = [];
+  const out = [], seen = new Set(), q = v => Math.round(v * 2000);
   for (let i = 0; i < arr.length; i += 6) {
     const dx = arr[i + 3] - arr[i], dy = arr[i + 4] - arr[i + 1], dz = arr[i + 5] - arr[i + 2];
-    const n = Math.max(1, Math.ceil(Math.hypot(dx, dy, dz) / max));
+    const len = Math.hypot(dx, dy, dz);
+    if (len < 1e-5) continue;
+    // where two boxes meet, both bring the same edge: draw it once
+    const a = q(arr[i]) + ',' + q(arr[i + 1]) + ',' + q(arr[i + 2]), b = q(arr[i + 3]) + ',' + q(arr[i + 4]) + ',' + q(arr[i + 5]);
+    const key = a < b ? a + '|' + b : b + '|' + a;
+    if (seen.has(key)) continue; seen.add(key);
+    const n = Math.max(1, Math.ceil(len / max));
     for (let k = 0; k < n; k++) out.push(arr[i] + dx * k / n, arr[i + 1] + dy * k / n, arr[i + 2] + dz * k / n, arr[i] + dx * (k + 1) / n, arr[i + 1] + dy * (k + 1) / n, arr[i + 2] + dz * (k + 1) / n);
   }
   return out;
 }
+// A fat line is a quad with a cap at either end: six triangles a segment. The lines here are a pixel or two wide,
+// so below the desktop tier the caps are left off: two triangles a segment, a third of the work for the same picture.
+const NOCAPS = [2, 4, 3, 4, 5, 3];
+export function lineGeo(positions) {
+  const g = new LineSegmentsGeometry(); g.setPositions(positions);
+  if (!high) g.setIndex(NOCAPS);
+  return g;
+}
 
 // ---------- parts: geometry collected per material, merged, with ink edges on top
+// seg: the longest run a line is cut into. 0.9 m wherever the camera walks; things it only sees from afar can take more.
 export class Part {
-  constructor(parent, pal, line, weights = {}) { this.parent = parent; this.pal = pal; this.line = line; this.weights = weights; this.b = new Map(); }
+  constructor(parent, pal, line, weights = {}, seg = 0.9) { this.parent = parent; this.pal = pal; this.line = line; this.weights = weights; this.seg = seg; this.b = new Map(); }
   add(key, ...gs) {
     const spec = this.pal[key];
     for (let g of gs) {
@@ -422,6 +455,9 @@ export class Part {
     return this;
   }
   build() {
+    // one mesh per material; the edges of everything that shares a pen go into one set of lines, and the
+    // silhouettes that share a hull into one mesh
+    const edges = new Map(), hulls = new Map();
     for (const [key, list] of this.b) {
       const spec = this.pal[key]; if (!spec) throw new Error('no material ' + key);
       const geo = mergeGeometries(list, false);
@@ -429,27 +465,63 @@ export class Part {
       mesh.castShadow = spec.cast ?? true; mesh.receiveShadow = spec.receive ?? true;
       this.parent.add(mesh);
       if (spec.edges !== false) {
-        const eg = new THREE.EdgesGeometry(geo, spec.thr ?? 30);
-        const l = new LineSegments2(new LineSegmentsGeometry().setPositions(shortSegs(eg.attributes.position.array)), spec.line || (spec.w && this.weights[spec.w]) || this.line);
-        this.parent.add(l);
+        const eg = new THREE.EdgesGeometry(geo, spec.thr ?? 30), lm = spec.line || (spec.w && this.weights[spec.w]) || this.line;
+        if (!edges.has(lm)) edges.set(lm, []);
+        edges.get(lm).push(eg.attributes.position.array);
       }
-      if (spec.hull) this.parent.add(new THREE.Mesh(geo, spec.hullMat || (spec.hullMat = hullMat(spec.hull === true ? 1 : spec.hull, spec.hullColor))));
+      if (spec.hull) {
+        const hm = spec.hullMat || (spec.hullMat = hullMat(spec.hull === true ? 1 : spec.hull, spec.hullColor));
+        if (!hulls.has(hm)) hulls.set(hm, []);
+        hulls.get(hm).push(geo);
+      }
+    }
+    for (const [lm, arrs] of edges) {
+      const all = new Float32Array(arrs.reduce((n, a) => n + a.length, 0)); let o = 0;
+      for (const a of arrs) { all.set(a, o); o += a.length; }
+      this.parent.add(new LineSegments2(lineGeo(shortSegs(all, this.seg)), lm));
+    }
+    for (const [hm, geos] of hulls) {
+      let geo = geos[0];
+      if (geos.length > 1) {
+        geo = new THREE.BufferGeometry();
+        for (const name of ['position', 'normal']) {
+          const all = new Float32Array(geos.reduce((n, g) => n + g.attributes[name].array.length, 0)); let o = 0;
+          for (const g of geos) { all.set(g.attributes[name].array, o); o += g.attributes[name].array.length; }
+          geo.setAttribute(name, new THREE.BufferAttribute(all, 3));
+        }
+      }
+      const hull = new THREE.Mesh(geo, hm); hull.castShadow = false; hull.receiveShadow = false; this.parent.add(hull);
     }
     this.b.clear();
     return this;
   }
 }
 // loose line segments (hatching, board joints): [[x0,y0,z0,x1,y1,z1], ...]
-export function segs(parent, list, mat) {
+export function segs(parent, list, mat, seg = 0.9) {
   if (!list.length) return null;
-  const g = new LineSegmentsGeometry(); g.setPositions(shortSegs(list.flat()));
-  const l = new LineSegments2(g, mat); parent.add(l); return l;
+  const l = new LineSegments2(lineGeo(shortSegs(list.flat(), seg)), mat); parent.add(l); return l;
 }
-// a dashed line we move every frame
-export function liveLine(mat) {
-  const g = new LineSegmentsGeometry(); g.setPositions([0, 0, 0, 0, 0.001, 0]);
-  const l = new LineSegments2(g, mat); l.frustumCulled = false; scene.add(l);
-  l.set = (list) => { if (!list.length) { l.visible = false; return; } l.visible = true; g.setPositions(list.flat()); l.computeLineDistances(); };
+// a dashed line we move every frame: one buffer of fixed size, rewritten in place and only when it changed
+export function liveLine(mat, cap = 96) {
+  const g = lineGeo(new Float32Array(cap * 6));
+  const l = new LineSegments2(g, mat); l.computeLineDistances(); l.frustumCulled = false; l.visible = false; scene.add(l);
+  const pos = g.attributes.instanceStart.data, dist = g.attributes.instanceDistanceStart.data;
+  pos.setUsage(THREE.DynamicDrawUsage); dist.setUsage(THREE.DynamicDrawUsage);
+  let sig = NaN;
+  l.set = (list) => {
+    const n = Math.min(list.length, cap);
+    if (!n) { l.visible = false; return; }
+    l.visible = true;
+    let s = n;
+    for (let i = 0; i < n; i++) { const a = list[i]; s += (a[0] + a[1] * 1.7 + a[2] * 2.3 + a[3] * 3.1 + a[4] * 4.3 + a[5] * 5.9) * (i + 1); }
+    if (s === sig) return; sig = s;
+    let d = 0;
+    for (let i = 0; i < n; i++) {
+      const a = list[i]; pos.array.set(a, i * 6);
+      dist.array[i * 2] = d; d += Math.hypot(a[3] - a[0], a[4] - a[1], a[5] - a[2]); dist.array[i * 2 + 1] = d;
+    }
+    pos.needsUpdate = true; dist.needsUpdate = true; g.instanceCount = n;
+  };
   return l;
 }
 
@@ -466,8 +538,10 @@ export function eyeKey(at, E, T, fov, extra = {}) {
     fov, h: 2 * D * Math.tan(fov * D2R / 2), sx: 0, sy: 0, ...extra,
   };
 }
+const PHKEYS = new WeakMap();
 export function camAt(keys0, p) {
-  const keys = ctx.phone ? keys0.map(k => k.ph ? { ...k, ...k.ph } : k) : keys0;
+  let keys = keys0;
+  if (ctx.phone) { keys = PHKEYS.get(keys0); if (!keys) PHKEYS.set(keys0, keys = keys0.map(k => k.ph ? { ...k, ...k.ph } : k)); }
   let i = 0; while (i < keys.length - 1 && p > keys[i + 1].at) i++;
   const a = keys[i], b = keys[Math.min(i + 1, keys.length - 1)];
   const u = a === b ? 0 : (b.easeFn || ease)(clamp((p - a.at) / (b.at - a.at)));
@@ -512,10 +586,22 @@ export function applyCam(c, R = 80) {
   camera.userData.D = D;
 }
 
+// ---------- the page over the canvas. Every write to the DOM goes through here and only happens when the value
+// changed: a label that stands still costs nothing, and the browser has no styles to recalculate.
+const r1 = v => Math.round(v * 10) / 10;
+export const dom = {
+  sty(el, k, v) { const c = el._s || (el._s = {}); if (c[k] !== v) { c[k] = v; el.style[k] = v; } },
+  op(el, v) { dom.sty(el, 'opacity', v <= 0.003 ? 0 : v >= 0.997 ? 1 : Math.round(v * 250) / 250); },
+  attr(el, k, v) { const c = el._a || (el._a = {}); if (c[k] !== v) { c[k] = v; el.setAttribute(k, v); } },
+  cls(el, k, on) { const c = el._k || (el._k = {}); if (c[k] !== on) { c[k] = on; el.classList.toggle(k, on); } },
+  html(el, v) { if (el._h !== v) { el._h = v; el.innerHTML = v; } },
+  text(el, v) { if (el._t !== v) { el._t = v; el.textContent = v; } },
+};
+
 // ---------- labels: a column to the right of the drawing, or tags beside their anchors
 const tmp = new THREE.Vector3();
 export class Labels {
-  constructor() { this.root = document.getElementById('labels'); this.svg = document.getElementById('leaders'); this.items = []; }
+  constructor() { this.root = document.getElementById('labels'); this.svg = document.getElementById('leaders'); this.items = []; this._rev = -1; this._w = 0; }
   add(o) {
     const el = document.createElement('div'); el.className = 'lab' + (o.mode === 'tag' ? ' tag' : '') + (o.cls ? ' ' + o.cls : '');
     el.innerHTML = `<span class="no">${o.no}</span><span class="nm">${o.name}</span>${o.short ? `<span class="nm-s">${o.short}</span>` : ''}${o.sub ? `<span class="sb">${o.sub}</span>` : ''}`;
@@ -524,17 +610,24 @@ export class Labels {
     const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     g.innerHTML = '<polyline class="halo"/><polyline/><circle r="3.0" class="halo"/><circle r="2.2" class="dot"/><circle r="5.2" class="reticle"/><line class="tick"/>';
     this.svg.appendChild(g);
-    const it = { ...o, el, g, op: 1, on: false }; this.items.push(it); return it;
+    const it = { ...o, el, g, op: 1, on: false, kids: [...g.children] }; this.items.push(it); this._rev = -1; return it;
+  }
+  // the widest label of the column, measured once per layout: the column may never run off the sheet
+  colW() {
+    if (this._rev !== ctx.rev) { this._rev = ctx.rev; this._w = 0; for (const it of this.items) if (it.mode !== 'tag') this._w = Math.max(this._w, it.el.offsetWidth); }
+    return this._w;
   }
   update(colX) {
     const W = ctx.W, H = ctx.H;
     const vis = [];
     for (const it of this.items) {
+      it.show = false;
+      if (it.op <= 0.01) continue;
       it.obj.updateWorldMatrix(true, false);
       tmp.copy(it.at).applyMatrix4(it.obj.matrixWorld).project(camera);
       it.ax = (tmp.x * .5 + .5) * W; it.ay = (-tmp.y * .5 + .5) * H;
       it.ly = it.ay + (it.dy || 0);
-      if (it.op > 0.01 && tmp.z < 1) vis.push(it);
+      if (tmp.z < 1) { it.show = true; vis.push(it); }
     }
     // keep column labels apart: sort by height, push down, then pull the block back up if it ran off
     const col = vis.filter(i => i.mode !== 'tag').sort((a, b) => (a.rank ?? a.ly) - (b.rank ?? b.ly) || a.ly - b.ly);
@@ -542,45 +635,71 @@ export class Labels {
     for (let k = 1; k < col.length; k++) col[k].ly = Math.max(col[k].ly, col[k - 1].ly + gap);
     const over = col.length ? col[col.length - 1].ly - (H - (ctx.phone ? 125 : 222)) : 0;
     if (over > 0) { col.forEach(i => i.ly -= over); for (let k = col.length - 2; k >= 0; k--) col[k].ly = Math.min(col[k].ly, col[k + 1].ly - gap); }
+    const xMax = col.length ? W - this.colW() - (ctx.phone ? 16 : 24) : W;
     for (const it of this.items) {
-      const show = it.op > 0.01 && vis.includes(it);
-      it.el.style.opacity = show ? it.op : 0; it.g.style.opacity = show ? it.op : 0;
-      it.el.classList.toggle('on', it.on); it.g.classList.toggle('on', it.on);
+      const show = it.show;
+      dom.op(it.el, show ? it.op : 0); dom.op(it.g, show ? it.op : 0);
       if (!show) continue;
-      const [ph, pl, ch, c, ret, tick] = it.g.children;
-      for (const e of [c, ch, ret]) { e.setAttribute('cx', it.ax); e.setAttribute('cy', it.ay); }
+      dom.cls(it.el, 'on', it.on); dom.cls(it.g, 'on', it.on);
+      const [ph, pl, ch, c, ret, tick] = it.kids;
+      const ax = r1(it.ax), ay = r1(it.ay);
+      for (const e of [c, ch, ret]) { dom.attr(e, 'cx', ax); dom.attr(e, 'cy', ay); }
       if (it.mode === 'tag') {
-        ret.style.display = 'none'; tick.style.display = 'none';
-        const tk = ctx.phone ? 0.55 : 1, lx = it.ax + (it.tx ?? 18) * tk, ly = it.ay + (it.ty ?? -18) * tk;
-        it.el.style.transform = (it.tx ?? 18) < 0 ? `translate(${lx - 6}px, ${ly - 8}px) translateX(-100%)` : `translate(${lx + 6}px, ${ly - 8}px)`;
-        it.el.style.textAlign = (it.tx ?? 18) < 0 ? 'right' : 'left';
-        for (const e of [pl, ph]) e.setAttribute('points', `${it.ax},${it.ay} ${lx},${ly}`);
+        dom.sty(ret, 'display', 'none'); dom.sty(tick, 'display', 'none');
+        const tk = ctx.phone ? 0.55 : 1, lx = r1(it.ax + (it.tx ?? 18) * tk), ly = r1(it.ay + (it.ty ?? -18) * tk);
+        dom.sty(it.el, 'transform', (it.tx ?? 18) < 0 ? `translate(${lx - 6}px, ${ly - 8}px) translateX(-100%)` : `translate(${lx + 6}px, ${ly - 8}px)`);
+        dom.sty(it.el, 'textAlign', (it.tx ?? 18) < 0 ? 'right' : 'left');
+        const pts = `${ax},${ay} ${lx},${ly}`;
+        dom.attr(pl, 'points', pts); dom.attr(ph, 'points', pts);
       } else {
-        ret.style.display = ''; tick.style.display = '';
-        const x = colX(it);
-        it.el.style.transform = `translate(${x + 10}px, ${it.ly - 8}px)`;
-        const elbow = Math.max(it.ax + 16, x - 36);
-        for (const e of [pl, ph]) e.setAttribute('points', `${it.ax},${it.ay} ${elbow},${it.ay} ${x - 10},${it.ly} ${x + 2},${it.ly}`);
-        tick.setAttribute('x1', x + 2); tick.setAttribute('y1', it.ly - 6);
-        tick.setAttribute('x2', x + 2); tick.setAttribute('y2', it.ly + 6);
+        dom.sty(ret, 'display', ''); dom.sty(tick, 'display', '');
+        const x = r1(Math.min(colX(it), xMax)), ly = r1(it.ly);
+        dom.sty(it.el, 'transform', `translate(${x + 10}px, ${ly - 8}px)`);
+        const elbow = r1(Math.max(it.ax + 16, x - 36));
+        const pts = `${ax},${ay} ${elbow},${ay} ${x - 10},${ly} ${x + 2},${ly}`;
+        dom.attr(pl, 'points', pts); dom.attr(ph, 'points', pts);
+        dom.attr(tick, 'x1', x + 2); dom.attr(tick, 'y1', ly - 6);
+        dom.attr(tick, 'x2', x + 2); dom.attr(tick, 'y2', ly + 6);
       }
     }
   }
 }
 
-export function resize() {
-  ctx.W = innerWidth; ctx.H = innerHeight; ctx.res.set(ctx.W, ctx.H); ctx.phone = ctx.W < 700;
-  document.body.classList.toggle('phone', ctx.phone);
-  renderer.setSize(ctx.W, ctx.H, false);
-  for (const m of ctx.lineMats) { m.resolution.copy(ctx.res); m.linewidth = m.userData.w * (ctx.phone ? 0.72 : 1); }
+// The renderer follows the canvas box, not the window. On a phone the canvas is as tall as the screen with the URL
+// bar away (100vh), so the bar sliding in and out changes nothing here: no buffers are rebuilt and nothing stretches.
+function setDpr(d) {
+  ctx.dpr = d; ctx.dirty = true;
+  renderer.setPixelRatio(d);                      // resizes the buffer to W x H x d
+  for (const m of ctx.lineMats) fitLine(m);
 }
+let gov = null;
+export function resize() {
+  const W = canvasEl.clientWidth || innerWidth, H = canvasEl.clientHeight || innerHeight;
+  if (gov && W === ctx.W && H === ctx.H) return;
+  ctx.W = W; ctx.H = H; ctx.res.set(W, H); ctx.phone = W < 700; ctx.rev++; ctx.dirty = true;
+  document.body.classList.toggle('phone', ctx.phone);
+  setArea(W, H);
+  renderer.setSize(W, H, false);
+  for (const m of ctx.lineMats) m.resolution.copy(ctx.res);
+  if (!gov) {
+    // a still or a recording keeps the device's resolution; the live page starts from the tier's budget
+    if (REC && pinnedDpr == null) { setDpr(Math.min(devicePixelRatio, 2)); gov = { frame() {}, hold() {}, refit() {}, dpr: ctx.dpr }; }
+    else gov = governor({ apply: setDpr });
+  } else { gov.refit(); gov.hold(600); for (const m of ctx.lineMats) fitLine(m); }
+}
+// once per animation frame: active = this frame is drawn at the full rate
+export function pace(now, active) { gov?.frame(now, active); }
+export function holdPace(ms) { gov?.hold(ms); }
 
 // ---------- canvas textures
+// draw() works in its own w x h pixels; on the phone tier the canvas behind it is half that size each way
 export function canvasTex(w, h, draw, o = {}) {
-  const c = document.createElement('canvas'); c.width = w; c.height = h;
-  draw(c.getContext('2d'), w, h);
+  const k = o.full ? 1 : TEXK;
+  const c = document.createElement('canvas'); c.width = Math.round(w * k); c.height = Math.round(h * k);
+  const g = c.getContext('2d'); g.scale(c.width / w, c.height / h);
+  draw(g, w, h);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 8; if (o.repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; }
+  t.anisotropy = ANISO; if (o.repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; }
   return t;
 }
 // a small seeded random, so every load draws the same boards and books
@@ -628,6 +747,9 @@ export const envMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.S
       if (rd.y < -0.0004 && ro.y > uGroundY) { P = ro + rd * ((uGroundY - ro.y) / rd.y); float d = length(P.xz); if (d > 20.0) P.xz *= 20.0 / d; }
       else { P = ro + rd * 18.0; if (length(P) > 21.0) P = normalize(P) * 21.0; }
       vec2 lv = liveAt(P);
+      if (lv.x + lv.y < 0.001) { gl_FragColor = vec4(uPaper, 1.0);
+        #include <colorspace_fragment>
+        return; }
       vec2 q = vUv, a = vec2(uAspect, 1.0);
       vec3 col = mix(uHorizon, uMid, smoothstep(0.0, 0.6, q.y));
       col = mix(col, uZenith, smoothstep(0.5, 1.08, q.y));
@@ -694,6 +816,7 @@ export const fxMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.Sh
 }));
 fxMesh.frustumCulled = false; fxMesh.renderOrder = 10000; scene.add(fxMesh);
 
+const DPR = { get value() { return ctx.dpr; } };
 // ---------- motes: specks of dust and pollen drifting in the light, only where the colour is
 export function motes(o) {
   const n = o.n ?? 400, r = rng(o.seed ?? 11);
@@ -702,9 +825,9 @@ export function motes(o) {
   for (let i = 0; i < n; i++) { pos.set([lerp(x0, x1, r()), lerp(y0, y1, r()), lerp(z0, z1, r())], i * 3); ph.set([r() * 6.283, 0.5 + r()], i * 2); }
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aPh', new THREE.BufferAttribute(ph, 2));
   const m = new THREE.ShaderMaterial({
-    uniforms: { ...LIVE, uSize: { value: o.size ?? 0.03 }, uRes: { value: ctx.res }, uCol: { value: new THREE.Color(o.color ?? '#ffe2b0') },
+    uniforms: { ...LIVE, uSize: { value: o.size ?? 0.03 }, uRes: { value: ctx.res }, uDpr: DPR, uCol: { value: new THREE.Color(o.color ?? '#ffe2b0') },
       uMin: { value: new THREE.Vector3(x0, y0, z0) }, uSpan: { value: new THREE.Vector3(x1 - x0, y1 - y0, z1 - z0) } },
-    vertexShader: LIVE_GLSL + `attribute vec2 aPh; uniform float uSize; uniform vec2 uRes; uniform vec3 uMin; uniform vec3 uSpan; varying float vA;
+    vertexShader: LIVE_GLSL + `attribute vec2 aPh; uniform float uSize; uniform vec2 uRes; uniform float uDpr; uniform vec3 uMin; uniform vec3 uSpan; varying float vA;
       void main() {
         vec3 p = position; float sp = aPh.y;
         p.y = uMin.y + mod(p.y - uMin.y + uTime * 0.05 * sp, uSpan.y);
@@ -714,7 +837,7 @@ export function motes(o) {
         float edgeFade = smoothstep(0.0, 0.12, k) * (1.0 - smoothstep(0.88, 1.0, k));
         vA = liveAt(wp.xyz).x * uLive * edgeFade * (0.45 + 0.55 * sin(uTime * 1.6 * sp + aPh.x * 3.0) * sin(uTime * 0.7 + aPh.x));
         vec4 mv = viewMatrix * wp; gl_Position = projectionMatrix * mv;
-        gl_PointSize = clamp(uSize * projectionMatrix[1][1] * uRes.y * 0.5 / max(-mv.z, 0.01), 1.0, 9.0);
+        gl_PointSize = max(1.0, clamp(uSize * projectionMatrix[1][1] * uRes.y * 0.5 / max(-mv.z, 0.01), 1.0, 9.0) * uDpr * 0.5);
       }`,
     fragmentShader: `uniform vec3 uCol; varying float vA;
       void main() { float d = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.0, d); a *= a; if (vA * a < 0.003) discard;
@@ -727,6 +850,7 @@ export function motes(o) {
 
 // ---------- dimensions: a dimension line with extension lines and ticks in glacier cyan, riding with its part,
 // and its figure set along the line in the page font
+const DPA = new THREE.Vector3(), DPB = new THREE.Vector3();
 export class Dims {
   constructor(root = document.getElementById('dims')) { this.root = root; this.items = []; this.groups = new Map(); this.panels = []; }
   // a build-up schedule on the sheet, with a leader to the place it describes
@@ -779,33 +903,35 @@ export class Dims {
     for (const pn of this.panels) if (pn.key === key) pn.op = v;
   }
   update() {
-    const W = ctx.W, H = ctx.H, pa = new THREE.Vector3(), pb = new THREE.Vector3();
+    const W = ctx.W, H = ctx.H, pa = DPA, pb = DPB;
     for (const pn of this.panels) {
       const show = pn.op > 0.01 && !ctx.phone;
-      pn.el.style.opacity = show ? pn.op : 0; pn.g.style.opacity = show ? pn.op : 0;
+      dom.op(pn.el, show ? pn.op : 0); dom.op(pn.g, show ? pn.op : 0);
       if (!show) continue;
       pn.obj.updateWorldMatrix(true, false);
       pa.copy(pn.at).applyMatrix4(pn.obj.matrixWorld).project(camera);
-      const ax = (pa.x * .5 + .5) * W, ay = (-pa.y * .5 + .5) * H, r = pn.el.getBoundingClientRect();
+      // the panel stands still on the page: its box is measured once per layout, not every frame
+      if (pn.rev !== ctx.rev) { pn.rev = ctx.rev; pn.rect = pn.el.getBoundingClientRect(); }
+      const ax = r1((pa.x * .5 + .5) * W), ay = r1((-pa.y * .5 + .5) * H), r = pn.rect;
       // up from the panel's top edge, then a short diagonal into the point
-      const sx = clamp(ax - 36, r.left + 24, r.right - 16), sy = r.top - 1, ey = Math.min(sy - 10, ay + 36);
+      const sx = r1(clamp(ax - 36, r.left + 24, r.right - 16)), sy = r1(r.top - 1), ey = r1(Math.min(sy - 10, ay + 36));
       const pts = `${sx},${sy} ${sx},${ey} ${ax},${ay}`;
       const [h, l, ch, c] = pn.g.children;
-      h.setAttribute('points', pts); l.setAttribute('points', pts);
-      for (const e of [ch, c]) { e.setAttribute('cx', ax); e.setAttribute('cy', ay); }
+      dom.attr(h, 'points', pts); dom.attr(l, 'points', pts);
+      for (const e of [ch, c]) { dom.attr(e, 'cx', ax); dom.attr(e, 'cy', ay); }
     }
     for (const it of this.items) {
-      if (it.op < 0.01) { it.el.style.opacity = 0; continue; }
+      if (it.op < 0.01) { dom.op(it.el, 0); continue; }
       it.obj.updateWorldMatrix(true, false);
       pa.copy(it.A).applyMatrix4(it.obj.matrixWorld).project(camera); pb.copy(it.B).applyMatrix4(it.obj.matrixWorld).project(camera);
-      if (pa.z > 1 || pb.z > 1) { it.el.style.opacity = 0; continue; }
+      if (pa.z > 1 || pb.z > 1) { dom.op(it.el, 0); continue; }
       const ax = (pa.x * .5 + .5) * W, ay = (-pa.y * .5 + .5) * H, bx2 = (pb.x * .5 + .5) * W, by = (-pb.y * .5 + .5) * H;
       let ang = it.o.flat ? 0 : Math.atan2(by - ay, bx2 - ax);
       if (ang > Math.PI / 2) ang -= Math.PI;
       if (ang < -Math.PI / 2) ang += Math.PI;
       const side = it.o.below ? '4px' : 'calc(-100% - 3px)';
-      it.el.style.transform = `translate(${(ax + bx2) / 2}px, ${(ay + by) / 2}px) rotate(${ang}rad) translate(-50%, ${side})`;
-      it.el.style.opacity = it.op;
+      dom.sty(it.el, 'transform', `translate(${r1((ax + bx2) / 2)}px, ${r1((ay + by) / 2)}px) rotate(${ang.toFixed(4)}rad) translate(-50%, ${side})`);
+      dom.op(it.el, it.op);
     }
   }
 }

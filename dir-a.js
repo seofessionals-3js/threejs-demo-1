@@ -4,7 +4,7 @@
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import {
   THREE, Part, bx, cyl, ball, panel, M, V, D2R, clamp, lerp, ease, ease2, win,
-  scene, lineMat, toneMat, segs, liveLine, eyeKey, camAt, canvasTex, ctx, ACCENT, INK, PAPER, patchFill,
+  scene, lineMat, toneMat, segs, liveLine, eyeKey, camAt, canvasTex, ctx, ACCENT, INK, PAPER, patchFill, low,
 } from './core.js';
 import { oakPlanks, oakBoard, whiteBrick, latticeRug } from './tex-a.js';
 
@@ -38,7 +38,8 @@ const hole = (y) => ([a, b, c, d]) => [[a, b - y], [c, b - y], [c, d - y], [a, d
 
 function rb(x0, y0, z0, x1, y1, z1, r = 0.04) {
   const w = Math.abs(x1 - x0), h = Math.abs(y1 - y0), d = Math.abs(z1 - z0);
-  const g = new RoundedBoxGeometry(w, h, d, 4, Math.min(r, Math.min(w, h, d) / 2 - 0.002));
+  // on a phone the soft corners of the cushions are a little coarser (they are a few pixels there)
+  const g = new RoundedBoxGeometry(w, h, d, low && r >= 0.03 ? 3 : 4, Math.min(r, Math.min(w, h, d) / 2 - 0.002));
   g.translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); return g;
 }
 // a rectangular bar from a to b whose width always stays horizontal (rails, lounger backs, handrails)
@@ -562,7 +563,7 @@ export async function build(labels, dims) {
     rafters: [L6.g, V(XR, Y0 + 0.11 * CP - T * SP, -0.11 * SP - T * CP)],
     roof: [L7.g, V(XR, Y0 + 0.44 * CP - T * SP, -0.44 * SP - T * CP)],
   };
-  const SHORT = { rafters: 'Sparren', eg: 'EG', og: 'OG' };
+  const SHORT = { rafters: 'Sparren', eg: 'EG', og: 'OG', glazing: 'Glas' };
   for (const L of layers) { const [obj, at] = anchor[L.id]; L.label = labels.add({ no: L.no, name: L.name, short: SHORT[L.id], sub: L.sub, obj, at, rank: 10 - Number(L.no) }); }
 
   // ---- dotted lines between the floating layers
@@ -703,6 +704,7 @@ export async function build(labels, dims) {
 
   return {
     update, keys, R: 80, introHook,
+    restFps: 12,          // a sheet at rest is still drawn now and then: the fire flickers
     // the house comes alive from its hearth: the colour spreads from the fire through the rooms, out over the
     // meadow and up into the sky. At the end it drains away from the top, the sky first, the floor last.
     live: {

@@ -1,20 +1,22 @@
 // Surfaces for the house in colour, painted once on canvas: warm oak boards like a well-oiled floor, the same oak
 // as a single board for cladding and joinery, white painted brick and a cream rug with a black lattice.
 // Every texture tiles in both directions and covers a square of `tile` metres (core.js toneMat o.realMap / o.mapM).
-import { THREE, rng, clamp } from './core.js';
+import { THREE, rng, clamp, TEXK, ANISO } from './core.js';
 
 function tex(c, repeat = true) {
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = ANISO;
   if (repeat) t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter;
   return t;
 }
-const canvas = (w, h = w) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; };
+// every painter below works in its own px; on the phone tier the canvas behind it is half that size each way
+const canvas = (w, h = w) => { const c = document.createElement('canvas'); c.width = Math.round(w * TEXK); c.height = Math.round(h * TEXK); const g = c.getContext('2d'); g.scale(TEXK, TEXK); return [c, g]; };
 const rgb = (c, a = 1) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`;
 const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
 
 // fine grain noise over the whole sheet, so nothing reads as flat paint up close
-function grain(g, w, h, amt, seed) {
+function grain(g, amt, seed) {
+  const w = g.canvas.width, h = g.canvas.height;
   const r = rng(seed), d = g.getImageData(0, 0, w, h), px = d.data;
   for (let i = 0; i < px.length; i += 4) { const n = (r() - 0.5) * amt; px[i] += n; px[i + 1] += n * 0.92; px[i + 2] += n * 0.8; }
   g.putImageData(d, 0, 0);
@@ -92,7 +94,7 @@ export function oakPlanks({ px = 2048, tile = 2.28, w = 0.19, seed = 5, base = [
       x += L; used += L;
     }
   }
-  grain(g, px, px, 9, seed + 1);
+  grain(g, 9, seed + 1);
   // seams: a dark hairline with a lit lip below it, and the board ends
   for (let row = 0; row < rows; row++) {
     const y = Math.round(row * H);
@@ -124,12 +126,12 @@ export function oakBoard({ px = 1024, tile = 1.2, seed = 9, base = [190, 148, 10
   }
   // make it tile top to bottom: near the edges, fade to a copy shifted by half a tile (continuous across the wrap)
   const [c2, g2] = canvas(px);
-  g2.drawImage(c, 0, -px / 2); g2.drawImage(c, 0, px / 2);
+  g2.drawImage(c, 0, -px / 2, px, px); g2.drawImage(c, 0, px / 2, px, px);
   const m = g2.createLinearGradient(0, 0, 0, px);
   m.addColorStop(0, 'rgba(0,0,0,1)'); m.addColorStop(0.18, 'rgba(0,0,0,0)'); m.addColorStop(0.82, 'rgba(0,0,0,0)'); m.addColorStop(1, 'rgba(0,0,0,1)');
   g2.globalCompositeOperation = 'destination-in'; g2.fillStyle = m; g2.fillRect(0, 0, px, px);
-  g.drawImage(c2, 0, 0);
-  grain(g, px, px, 8, seed + 3);
+  g.drawImage(c2, 0, 0, px, px);
+  grain(g, 8, seed + 3);
   return tex(c);
 }
 
@@ -158,7 +160,7 @@ export function whiteBrick({ px = 1024, tile = 1.2, seed = 13 } = {}) {
       draw(x); if (x + bw > px) draw(x - px); if (x < 0) draw(x + px);
     }
   }
-  grain(g, px, px, 10, seed + 5);
+  grain(g, 10, seed + 5);
   return tex(c);
 }
 
@@ -182,6 +184,6 @@ export function latticeRug({ px = 1024, tile = 1.2, seed = 21 } = {}) {
     const x = (a + 0.5) * cw, y = (b + 0.5) * cw;
     g.lineWidth = 6; g.beginPath(); g.moveTo(x - 10, y); g.lineTo(x + 10, y); g.stroke();
   }
-  grain(g, px, px, 12, seed + 7);
+  grain(g, 12, seed + 7);
   return tex(c);
 }

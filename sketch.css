@@ -435,3 +435,13 @@ body.phone #legend {
 body.phone .lab.tag { display: none; }
 
 
+
+/* phone landscape: only room for the headline; the lede, spec block and roof panel step back */
+@media (max-height: 520px) {
+  #lede, #spec, .dimpanel, #legend { display: none !important; }
+  h1 { font-size: 26px; }
+  .kicker { margin-bottom: 8px; }
+  #hero { top: 70px; }
+  nav #nav { display: none; }
+  .lab .sb { display: none; }
+}

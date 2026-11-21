@@ -18,7 +18,7 @@ const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
 function grain(g, amt, seed) {
   const w = g.canvas.width, h = g.canvas.height;
   const r = rng(seed), d = g.getImageData(0, 0, w, h), px = d.data;
-  for (let i = 0; i < px.length; i += 4) { const n = (r() - 0.5) * amt; px[i] += n; px[i + 1] += n * 0.92; px[i + 2] += n * 0.8; }
+  for (let i = 0; i < px.length; i += 4) { const n = (r() - 0.5) * amt; px[i] += n; px[i + 1] += n * 0.97; px[i + 2] += n * 0.9; }
   g.putImageData(d, 0, 0);
 }
 
@@ -41,7 +41,7 @@ function board(g, x, y, L, H, seed, base, horizontal) {
     const v = r() * H, bw = H * (0.15 + r() * 0.35);
     const b = g.createLinearGradient(0, v - bw, 0, v + bw);
     const dark = r() < 0.6;
-    b.addColorStop(0, 'rgba(0,0,0,0)'); b.addColorStop(0.5, dark ? 'rgba(96,58,26,0.10)' : 'rgba(255,232,190,0.10)'); b.addColorStop(1, 'rgba(0,0,0,0)');
+    b.addColorStop(0, 'rgba(0,0,0,0)'); b.addColorStop(0.5, dark ? 'rgba(110,84,56,0.10)' : 'rgba(255,232,190,0.10)'); b.addColorStop(1, 'rgba(0,0,0,0)');
     g.fillStyle = b; g.fillRect(0, v - bw, L, bw * 2);
   }
   // grain lines
@@ -49,7 +49,7 @@ function board(g, x, y, L, H, seed, base, horizontal) {
   for (let k = 0; k < n; k++) {
     const v0 = r() * H, amp = 0.6 + r() * 2.2, f = 0.002 + r() * 0.006, ph = r() * 6.3;
     const dark = r() < 0.72;
-    g.strokeStyle = dark ? `rgba(84,50,22,${0.05 + r() * 0.13})` : `rgba(255,236,200,${0.05 + r() * 0.1})`;
+    g.strokeStyle = dark ? `rgba(96,72,50,${0.05 + r() * 0.13})` : `rgba(255,236,200,${0.05 + r() * 0.1})`;
     g.lineWidth = 0.6 + r() * 1.6;
     g.beginPath();
     for (let u = -4; u <= L + 8; u += 8) { const v = v0 + Math.sin(u * f + ph) * amp + Math.sin(u * f * 3.1 + ph * 2) * amp * 0.3; u < 0 ? g.moveTo(u, v) : g.lineTo(u, v); }
@@ -60,7 +60,7 @@ function board(g, x, y, L, H, seed, base, horizontal) {
     const cu = L * (0.2 + r() * 0.6), cv = H * (0.3 + r() * 0.4), len = L * (0.18 + r() * 0.25);
     for (let k = 1; k < 7; k++) {
       const w = H * 0.07 * k, l = len * (0.45 + k * 0.12);
-      g.strokeStyle = `rgba(92,56,24,${0.16 - k * 0.016})`; g.lineWidth = 1.2 + r();
+      g.strokeStyle = `rgba(100,76,52,${0.16 - k * 0.016})`; g.lineWidth = 1.2 + r();
       g.beginPath(); g.moveTo(cu - l, cv - w);
       g.bezierCurveTo(cu - l * 0.2, cv - w, cu + l * 0.35, cv - w * 0.35, cu + l * 0.45, cv);
       g.bezierCurveTo(cu + l * 0.35, cv + w * 0.35, cu - l * 0.2, cv + w, cu - l, cv + w);
@@ -71,7 +71,7 @@ function board(g, x, y, L, H, seed, base, horizontal) {
   if (r() < 0.22) {
     const ku = L * (0.1 + r() * 0.8), kv = H * (0.25 + r() * 0.5), kr = H * (0.04 + r() * 0.05);
     for (let k = 4; k >= 1; k--) {
-      g.fillStyle = `rgba(${78 + k * 12},${46 + k * 9},${22 + k * 5},${0.1 + (4 - k) * 0.1})`;
+      g.fillStyle = `rgba(${92 + k * 10},${70 + k * 8},${48 + k * 5},${0.1 + (4 - k) * 0.1})`;
       g.beginPath(); g.ellipse(ku, kv, kr * k * 0.9, kr * k * 0.45, 0, 0, 7); g.fill();
     }
   }
@@ -98,11 +98,11 @@ export function oakPlanks({ px = 2048, tile = 2.28, w = 0.19, seed = 5, base = [
   // seams: a dark hairline with a lit lip below it, and the board ends
   for (let row = 0; row < rows; row++) {
     const y = Math.round(row * H);
-    g.fillStyle = `rgba(58,36,18,${seams})`; g.fillRect(0, y - 1, px, 2);
+    g.fillStyle = `rgba(64,50,36,${seams})`; g.fillRect(0, y - 1, px, 2);
     g.fillStyle = 'rgba(255,240,215,0.12)'; g.fillRect(0, y + 1, px, 1);
   }
   for (const [x, y] of ends) {
-    g.fillStyle = `rgba(58,36,18,${seams * 0.9})`; g.fillRect(Math.round(x) - 1, y, 2, H);
+    g.fillStyle = `rgba(64,50,36,${seams * 0.9})`; g.fillRect(Math.round(x) - 1, y, 2, H);
     if (x < 2) g.fillRect(px - 1, y, 1, H);
   }
   return tex(c);

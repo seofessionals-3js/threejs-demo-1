@@ -1,19 +1,19 @@
 :root {
-  /* black sheet, white ink, red pen */
-  --paper: #0c0c0e;
-  --paper-hi: #141416;
-  --surface: rgba(20, 20, 23, 0.92);
-  --surface-hi: rgba(30, 30, 34, 0.94);
-  --ink: #f1eeea;
-  --ink-line: rgba(241, 238, 234, 0.2);
-  --ink-faint: rgba(241, 238, 234, 0.09);
-  --mute: #96938f;
-  --accent: #e5202e;
-  --accent-hi: #ff4d57;
-  --accent-deep: #8c111b;
-  /* glacier cyan: dimensions, the colour front, autoplay */
-  --accent2: #43c4d2;
-  --accent2-soft: rgba(67, 196, 210, 0.16);
+  /* cyanotype blueprint: Prussian blue sheet, white print lines, yellow pencil */
+  --paper: #1e4a8c;
+  --paper-hi: #2859a4;
+  --surface: rgba(22, 58, 114, 0.94);
+  --surface-hi: rgba(30, 74, 140, 0.96);
+  --ink: #f3f6fb;
+  --ink-line: rgba(243, 246, 251, 0.24);
+  --ink-faint: rgba(243, 246, 251, 0.1);
+  --mute: #a9d2f2;
+  --accent: #f4b63f;
+  --accent-hi: #ffd27a;
+  --accent-deep: #b97d12;
+  /* secondary line tint: dimensions, autoplay */
+  --accent2: #a9d2f2;
+  --accent2-soft: rgba(169, 210, 242, 0.16);
   --mono: 'IBM Plex Mono', ui-monospace, monospace;
   --display: 'Chakra Petch', sans-serif;
   --sans: 'Chakra Petch', sans-serif;
@@ -30,9 +30,9 @@ body { font-family: var(--sans); -webkit-font-smoothing: antialiased; overscroll
 /* CAD sheet registration frame & corner brackets */
 #cad-frame {
   position: fixed; inset: 12px; pointer-events: none; z-index: 1;
-  border: 1px solid rgba(241, 238, 234, 0.16);
+  border: 1px solid rgba(243, 246, 251, 0.16);
 }
-#cad-frame .c { position: absolute; width: 14px; height: 14px; border-color: rgba(241, 238, 234, 0.65); border-style: solid; }
+#cad-frame .c { position: absolute; width: 14px; height: 14px; border-color: rgba(243, 246, 251, 0.65); border-style: solid; }
 #cad-frame .tl { top: -1px; left: -1px; border-width: 1.5px 0 0 1.5px; }
 #cad-frame .tr { top: -1px; right: -1px; border-width: 1.5px 1.5px 0 0; }
 #cad-frame .bl { bottom: -1px; left: -1px; border-width: 0 0 1.5px 1.5px; }
@@ -75,7 +75,7 @@ body { font-family: var(--sans); -webkit-font-smoothing: antialiased; overscroll
 .dir-switch {
   display: flex; align-items: stretch;
   font-family: var(--mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
-  background: rgba(12, 12, 14, 0.94);
+  background: rgba(22, 58, 114, 0.94);
   border: 1.5px solid var(--ink);
 }
 .dir-switch a {
@@ -86,7 +86,7 @@ body { font-family: var(--sans); -webkit-font-smoothing: antialiased; overscroll
 }
 .dir-switch a:last-child { border-right: none; }
 .dir-switch a b { color: var(--ink); font-weight: 600; }
-.dir-switch a:hover { background: rgba(241, 238, 234, 0.06); color: var(--ink); }
+.dir-switch a:hover { background: rgba(243, 246, 251, 0.06); color: var(--ink); }
 .dir-switch a.active { background: var(--ink); color: var(--paper); }
 .dir-switch a.active b { color: var(--accent); }
 
@@ -95,13 +95,13 @@ nav {
   font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase;
 }
 nav #nav {
-  background: rgba(12, 12, 14, 0.9);
+  background: rgba(22, 58, 114, 0.9);
   padding: 7px 11px;
   border: 1px solid var(--ink-line);
 }
 .pill {
   font: 600 10.5px var(--mono); letter-spacing: .12em; text-transform: uppercase;
-  background: rgba(12, 12, 14, 0.94); border: 1.5px solid var(--ink);
+  background: rgba(22, 58, 114, 0.94); border: 1.5px solid var(--ink);
   padding: 8px 14px; border-radius: 0; color: var(--ink); text-decoration: none;
   transition: background .15s, color .15s;
 }
@@ -116,8 +116,8 @@ nav #nav {
   font-family: var(--mono); font-size: 10px; font-weight: 600;
   letter-spacing: .16em; text-transform: uppercase; color: var(--accent-hi);
   margin-bottom: 14px; padding: 4px 10px;
-  background: rgba(12, 12, 14, 0.92);
-  border: 1px solid rgba(229, 32, 46, 0.35);
+  background: rgba(22, 58, 114, 0.92);
+  border: 1px solid rgba(244, 182, 63, 0.35);
   border-left: 3px solid var(--accent);
 }
 h1 {
@@ -126,13 +126,13 @@ h1 {
 }
 h1 em {
   font-style: normal; color: var(--accent);
-  background: rgba(229, 32, 46, 0.1); padding: 0 8px; border-left: 3px solid var(--accent);
+  background: rgba(244, 182, 63, 0.1); padding: 0 8px; border-left: 3px solid var(--accent);
 }
 #lede {
   margin-top: 16px;
   font: 500 10.5px/1.65 var(--mono); letter-spacing: .06em; text-transform: uppercase;
   max-width: 345px; color: var(--ink);
-  background: rgba(12, 12, 14, 0.88);
+  background: rgba(22, 58, 114, 0.88);
   padding: 8px 12px; border-left: 2px solid var(--ink);
 }
 #spec {
@@ -140,11 +140,11 @@ h1 em {
   width: max-content; min-width: 280px;
   font-family: var(--mono); font-size: 10px; letter-spacing: .11em; text-transform: uppercase;
   border: 1.5px solid var(--ink);
-  background: rgba(12, 12, 14, 0.94);
+  background: rgba(22, 58, 114, 0.94);
 }
 #spec dt, #spec dd { padding: 6px 13px; border-bottom: 1px solid var(--ink-line); }
 #spec dt:last-of-type, #spec dd:last-of-type { border-bottom: none; }
-#spec dt { color: var(--mute); border-right: 1px solid var(--ink-line); background: rgba(241, 238, 234, 0.04); font-weight: 500; }
+#spec dt { color: var(--mute); border-right: 1px solid var(--ink-line); background: rgba(243, 246, 251, 0.04); font-weight: 500; }
 #spec dd { color: var(--ink); font-weight: 600; }
 
 /* Bottom CAD status bar */
@@ -160,13 +160,13 @@ h1 em {
   padding: 6px 12px;
 }
 .hint-wrap {
-  background: rgba(12, 12, 14, 0.92); color: var(--ink);
-  border: 1px solid rgba(241, 238, 234, 0.25);
+  background: rgba(22, 58, 114, 0.92); color: var(--ink);
+  border: 1px solid rgba(243, 246, 251, 0.25);
 }
 .hint-dot {
   width: 6px; height: 6px; background: var(--accent); display: inline-block;
 }
-.cam-readout { font-size: 10px; letter-spacing: .14em; color: rgba(241, 238, 234, 0.72); }
+.cam-readout { font-size: 10px; letter-spacing: .14em; color: rgba(243, 246, 251, 0.72); }
 .cam-readout b { color: var(--accent-hi); font-weight: 600; }
 #counter b { color: var(--accent-hi); font-weight: 600; margin: 0 3px; }
 
@@ -177,7 +177,7 @@ h1 em {
   background: var(--surface); color: var(--ink);
   padding: 14px 18px;
   border: none; border-left: 3px solid var(--accent); border-radius: 0;
-  box-shadow: inset 0 0 0 1px rgba(241, 238, 234, 0.07);
+  box-shadow: inset 0 0 0 1px rgba(243, 246, 251, 0.07);
   font-family: var(--mono); text-transform: uppercase; opacity: 0;
   z-index: 3;
 }
@@ -190,7 +190,7 @@ h1 em {
 }
 #caption .m {
   font: 400 10px var(--mono); letter-spacing: .12em; text-transform: uppercase;
-  color: rgba(241, 238, 234, 0.7); display: block;
+  color: rgba(243, 246, 251, 0.7); display: block;
 }
 
 /* Interactive Bottom-Right CAD Radar (#cad-map) */
@@ -211,24 +211,24 @@ h1 em {
   width: 100%; height: 68px; display: block; overflow: visible;
 }
 #cad-map .cm-zone {
-  fill: rgba(229, 32, 46, 0.0); stroke: none; cursor: pointer;
+  fill: rgba(244, 182, 63, 0.0); stroke: none; cursor: pointer;
   transition: fill .15s ease;
 }
 #cad-map .cm-zone.active {
-  fill: rgba(229, 32, 46, 0.18); stroke: rgba(229, 32, 46, 0.55); stroke-width: 0.16;
+  fill: rgba(244, 182, 63, 0.18); stroke: rgba(244, 182, 63, 0.55); stroke-width: 0.16;
 }
 #cad-map .cm-zone:hover {
-  fill: rgba(229, 32, 46, 0.34); stroke: var(--accent-hi); stroke-width: 0.22;
+  fill: rgba(244, 182, 63, 0.34); stroke: var(--accent-hi); stroke-width: 0.22;
 }
 #cad-map .cm-stops {
   display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px;
   margin-top: 6px; padding-top: 5px;
-  border-top: 1px solid rgba(241, 238, 234, 0.14);
+  border-top: 1px solid rgba(243, 246, 251, 0.14);
 }
 #cad-map .cm-btn {
-  appearance: none; background: rgba(241, 238, 234, 0.05);
-  border: 1px solid rgba(241, 238, 234, 0.17);
-  color: rgba(241, 238, 234, 0.74);
+  appearance: none; background: rgba(243, 246, 251, 0.05);
+  border: 1px solid rgba(243, 246, 251, 0.17);
+  color: rgba(243, 246, 251, 0.74);
   font: 600 7.5px/1 var(--mono); letter-spacing: .05em; text-transform: uppercase;
   padding: 4px 2px; cursor: pointer; text-align: center;
   transition: background .14s, color .14s, border-color .14s;
@@ -236,10 +236,10 @@ h1 em {
 #cad-map.many { width: 252px; }
 #cad-map.many .cm-btn { font-size: 7px; letter-spacing: .02em; padding: 4px 0; overflow: hidden; }
 #cad-map .cm-btn:hover {
-  background: rgba(229, 32, 46, 0.3); color: #fff; border-color: var(--accent-hi);
+  background: rgba(244, 182, 63, 0.3); color: var(--ink); border-color: var(--accent-hi);
 }
 #cad-map .cm-btn.active {
-  background: var(--accent); color: #fff; border-color: var(--accent);
+  background: var(--accent); color: #14264a; border-color: var(--accent);
 }
 
 /* Exploded layer & material callout labels */
@@ -249,8 +249,8 @@ h1 em {
   will-change: transform, opacity;
 }
 .lab:not(.tag) {
-  background: rgba(16, 16, 19, 0.94);
-  border: 1px solid rgba(241, 238, 234, 0.24);
+  background: rgba(22, 58, 114, 0.94);
+  border: 1px solid rgba(243, 246, 251, 0.24);
   border-left: 3px solid var(--ink);
   padding: 5px 11px 5px 8px;
   margin: -6px 0 0 -4px;
@@ -258,21 +258,21 @@ h1 em {
 }
 .lab:not(.tag).on {
   border-color: var(--accent);
-  border-left-color: #fff;
+  border-left-color: var(--ink);
   background: var(--accent);
-  color: #fff;
+  color: #14264a;
 }
 .lab .no {
   color: var(--accent-hi); font-size: 10px; font-weight: 600; letter-spacing: .12em;
   margin-right: 8px; padding: 1px 5px;
-  background: rgba(229, 32, 46, 0.14);
-  border: 1px solid rgba(229, 32, 46, 0.42);
+  background: rgba(244, 182, 63, 0.14);
+  border: 1px solid rgba(244, 182, 63, 0.42);
 }
-.lab.on .no { background: #fff; color: var(--accent); border-color: #fff; }
+.lab.on .no { background: #14264a; color: var(--accent-hi); border-color: #14264a; }
 .lab .nm { font-family: var(--display); font-size: 13px; font-weight: 600; letter-spacing: .12em; color: var(--ink); }
-.lab.on .nm { color: #fff; }
+.lab.on .nm { color: #14264a; }
 .lab .sb { display: block; margin-top: 3px; font-size: 9.5px; letter-spacing: .1em; color: var(--mute); }
-.lab.on .sb { color: rgba(255, 255, 255, 0.84); }
+.lab.on .sb { color: rgba(20, 38, 74, 0.84); }
 .lab.tag { text-align: left; }
 
 .lab.code { font-size: 10px; }
@@ -299,7 +299,7 @@ h1 em {
 #leaders .on circle.reticle { stroke: var(--accent); opacity: 0.9; }
 #leaders .on line.tick { stroke: var(--accent); }
 
-#fade { position: fixed; inset: 0; background: #050506; pointer-events: none; z-index: 10; }
+#fade { position: fixed; inset: 0; background: #163a72; pointer-events: none; z-index: 10; }
 #loader {
   position: fixed; left: 50%; bottom: 56px; transform: translateX(-50%);
   display: flex; flex-direction: column; align-items: stretch; gap: 8px;
@@ -310,12 +310,12 @@ h1 em {
   color: var(--ink); pointer-events: none; z-index: 9;
 }
 #loader .lhead {
-  display: flex; justify-content: space-between; font-size: 9px; color: rgba(241, 238, 234, 0.6);
-  border-bottom: 1px solid rgba(241, 238, 234, 0.15); padding-bottom: 5px; letter-spacing: .14em;
+  display: flex; justify-content: space-between; font-size: 9px; color: rgba(243, 246, 251, 0.6);
+  border-bottom: 1px solid rgba(243, 246, 251, 0.15); padding-bottom: 5px; letter-spacing: .14em;
 }
 #loader .lhead #lpen { color: var(--accent-hi); font-weight: 600; }
 #loader #ltext { font-weight: 600; text-align: center; padding: 2px 0; }
-#loader i { display: block; width: 100%; height: 3px; background: rgba(241, 238, 234, 0.15); }
+#loader i { display: block; width: 100%; height: 3px; background: rgba(243, 246, 251, 0.15); }
 #loader b { display: block; height: 100%; background: var(--accent); transform-origin: 0 50%; transform: scaleX(0); }
 
 h1 .ln { display: block; overflow: hidden; padding-bottom: .08em; margin-bottom: -.08em; }
@@ -353,7 +353,7 @@ body.phone .lab .no { font-size: 9px; margin-right: 5px; padding: 1px 4px; }
 .lab .nm-s { display: none; font-family: var(--display); font-size: 10.5px; font-weight: 600; letter-spacing: .09em; }
 body.phone .lab.has-s .nm { display: none; }
 body.phone .lab .nm-s { display: inline; }
-body.phone .lab.on .nm-s { color: #fff; }
+body.phone .lab.on .nm-s { color: #14264a; }
 
 .bottom span { transition: none; }
 
@@ -363,7 +363,7 @@ body.phone .lab.on .nm-s { color: #fff; }
 .play {
   display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
   font: 600 10px var(--mono); letter-spacing: .14em; text-transform: uppercase;
-  background: rgba(12, 12, 14, 0.94); color: var(--ink);
+  background: rgba(22, 58, 114, 0.94); color: var(--ink);
   border: 1px solid var(--accent2); padding: 6px 12px 6px 10px;
   transition: background .15s, color .15s;
 }
@@ -387,23 +387,23 @@ body.phone .play span { display: none; }
   position: absolute; left: 0; top: 0; white-space: nowrap; transform-origin: 0 0;
   font: 600 10px/1.15 var(--mono); letter-spacing: .08em; text-transform: uppercase;
   color: var(--accent2); opacity: 0; will-change: transform, opacity;
-  text-shadow: 0 0 3px #0c0c0e, 0 0 6px #0c0c0e, 0 0 1px #0c0c0e;
+  text-shadow: 0 0 3px #1e4a8c, 0 0 6px #1e4a8c, 0 0 1px #1e4a8c;
 }
-.dim b { font-weight: 600; background: rgba(12, 12, 14, 0.8); padding: 1px 4px; }
-.dim span { display: block; width: max-content; margin: 1px auto 0; font-size: 8.5px; font-weight: 500; letter-spacing: .1em; color: rgba(241, 238, 234, 0.86); background: rgba(12, 12, 14, 0.72); padding: 0 4px; }
+.dim b { font-weight: 600; background: rgba(22, 58, 114, 0.8); padding: 1px 4px; }
+.dim span { display: block; width: max-content; margin: 1px auto 0; font-size: 8.5px; font-weight: 500; letter-spacing: .1em; color: rgba(243, 246, 251, 0.86); background: rgba(22, 58, 114, 0.72); padding: 0 4px; }
 body.phone .dim { font-size: 8.5px; }
 body.phone .dim span { display: none; }
 .dimpanel {
   position: absolute; left: 30px; bottom: 118px; width: 330px; opacity: 0;
-  background: rgba(12, 12, 14, 0.92); border: 1px solid rgba(67, 196, 210, 0.45); border-left: 3px solid var(--accent2);
+  background: rgba(22, 58, 114, 0.92); border: 1px solid rgba(169, 210, 242, 0.45); border-left: 3px solid var(--accent2);
   padding: 9px 12px 9px 11px; font: 500 9.5px/1.45 var(--mono); letter-spacing: .07em; text-transform: uppercase; color: var(--ink);
 }
 .dimpanel .dp-h { font-weight: 600; letter-spacing: .14em; color: var(--accent2); margin-bottom: 6px; display: flex; gap: 8px; align-items: center; }
 .dimpanel .dp-h i { font-style: normal; color: var(--paper); background: var(--accent2); padding: 0 5px; }
 .dimpanel table { border-collapse: collapse; width: 100%; }
-.dimpanel td { padding: 2px 0; border-top: 1px solid rgba(241, 238, 234, 0.1); vertical-align: top; }
+.dimpanel td { padding: 2px 0; border-top: 1px solid rgba(243, 246, 251, 0.1); vertical-align: top; }
 .dimpanel td:first-child { width: 44px; color: var(--accent2); font-weight: 600; text-align: right; padding-right: 10px; }
-.dimpanel .dp-f { margin-top: 6px; padding-top: 5px; border-top: 1px solid rgba(67, 196, 210, 0.3); color: var(--mute); }
+.dimpanel .dp-f { margin-top: 6px; padding-top: 5px; border-top: 1px solid rgba(169, 210, 242, 0.3); color: var(--mute); }
 #leaders .dimlead polyline { stroke: var(--accent2); stroke-width: 1; fill: none; }
 #leaders .dimlead polyline.halo { stroke: var(--paper); stroke-width: 4; opacity: .9; }
 #leaders .dimlead circle { fill: var(--accent2); }
@@ -413,12 +413,16 @@ body.phone .dim span { display: none; }
 #xfer {
   position: fixed; inset: 0; z-index: 11; pointer-events: none; opacity: 0;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
-  background: #050506; color: var(--ink); text-transform: uppercase;
+  background: #163a72; color: var(--ink); text-transform: uppercase;
 }
 html.chain #xfer { opacity: 1; }
 html.chain #fade { display: none; }
 #xfer .xk { font: 500 10px var(--mono); letter-spacing: .24em; color: var(--mute); }
-#xfer .xn { font: 600 15px var(--mono); letter-spacing: .3em; color: var(--accent2); padding: 3px 10px; border: 1px solid var(--accent2); }
+#xfer .xn { font: 600 15px var(--mono); letter-spacing: .3em; color: var(--accent); padding: 3px 10px; border: 1px solid var(--accent); }
+/* the card for Demo 2 is its own medium: vellum, ink, one orange number chip */
+#xfer.vellum { background: #e9e7e0; color: #1b1c1e; }
+#xfer.vellum .xk { color: #5f5d57; }
+#xfer.vellum .xn { background: #e07a12; border-color: #e07a12; color: #1b1c1e; }
 #xfer .xt { font: 600 clamp(36px, 5vw, 64px)/1 var(--display); letter-spacing: .02em; }
 
 #legend { display: none; }

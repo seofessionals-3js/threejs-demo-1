@@ -79,7 +79,7 @@ function board(g, x, y, L, H, seed, base, horizontal) {
 }
 
 // boards laid in rows, staggered ends; tile metres square, rows of `w` metres. horizontal: rows run along u.
-export function oakPlanks({ px = 2048, tile = 2.28, w = 0.19, seed = 5, base = [184, 142, 102], seams = 0.5 } = {}) {
+export function oakPlanks({ px = 2048, tile = 2.28, w = 0.19, seed = 5, base = [196, 154, 102], seams = 0.5 } = {}) {
   const [c, g] = canvas(px), S = px / tile, H = w * S, rows = Math.round(tile / w), r = rng(seed);
   g.fillStyle = rgb(base); g.fillRect(0, 0, px, px);
   const ends = [];
@@ -109,7 +109,7 @@ export function oakPlanks({ px = 2048, tile = 2.28, w = 0.19, seed = 5, base = [
 }
 
 // one continuous board face, grain running up the texture (v), broad tone bands so neighbouring boards differ
-export function oakBoard({ px = 1024, tile = 1.2, seed = 9, base = [190, 148, 106] } = {}) {
+export function oakBoard({ px = 1024, tile = 1.2, seed = 9, base = [196, 154, 102] } = {}) {
   const [c, g] = canvas(px), r = rng(seed);
   g.fillStyle = rgb(base); g.fillRect(0, 0, px, px);
   // vertical strips of slightly different wood, so cut boards don't all match; each strip wraps top to bottom
@@ -145,7 +145,7 @@ export function whiteBrick({ px = 1024, tile = 1.2, seed = 13 } = {}) {
     const y = row * ch, off = (row % 2) * bw / 2;
     for (let k = -1; k <= 5; k++) {
       const x = k * bw + off, t = r();
-      const col = mix([238, 235, 229], [247, 245, 240], t);
+      const col = mix([232, 228, 219], [240, 236, 227], t);
       const draw = (xx) => {
         g.fillStyle = rgb(col); g.fillRect(xx + j / 2, y + j / 2, bw - j, ch - j);
         // the paint pools a little at the bottom edge, and the top catches the light
@@ -167,7 +167,7 @@ export function whiteBrick({ px = 1024, tile = 1.2, seed = 13 } = {}) {
 // cream wool with a black hand-drawn lattice of diamonds
 export function latticeRug({ px = 1024, tile = 1.2, seed = 21 } = {}) {
   const [c, g] = canvas(px), r = rng(seed);
-  g.fillStyle = '#e9e0cf'; g.fillRect(0, 0, px, px);
+  g.fillStyle = '#e9e2d2'; g.fillRect(0, 0, px, px);
   for (let i = 0; i < 9000; i++) { g.fillStyle = r() < 0.5 ? 'rgba(255,250,240,0.18)' : 'rgba(150,130,100,0.10)'; g.fillRect(r() * px, r() * px, 1.5, 3 + r() * 4); }
   const n = 4, cw = px / n;
   g.strokeStyle = 'rgba(30,28,26,0.92)'; g.lineCap = 'round';

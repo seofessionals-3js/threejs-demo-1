@@ -21,12 +21,12 @@ export async function build(labels) {
   Object.assign(sun.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 5, far: 160 });
   sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.04; sun.target.position.set(0, 10, 0);
   scene.add(sun, sun.target);
-  scene.fog = new THREE.Fog('#0c0c0e', 140, 420);
+  scene.fog = new THREE.Fog('#1e4a8c', 140, 420);
 
   const T = textures();
   const PAL = {
-    card: { mat: stdMat('#101012', { real: '#f2ede4', rough: 0.95, bumpMap: T.concBump, bumpScale: 0.006 }), uvScale: 0.2 },
-    street: { mat: stdMat('#18181b', { real: '#dcd6cc', rough: 0.95, bumpMap: T.concBump, bumpScale: 0.008 }), uvScale: 0.15 },
+    card: { mat: stdMat('#101012', { real: '#f3f0e9', rough: 0.95, bumpMap: T.concBump, bumpScale: 0.006 }), uvScale: 0.2 },
+    street: { mat: stdMat('#18181b', { real: '#b8b5ad', rough: 0.95, bumpMap: T.concBump, bumpScale: 0.008 }), uvScale: 0.15 },
     clt: { mat: stdMat('#84848a', { rough: 0.62, map: T.clt, bumpMap: T.cltBump, bumpScale: 0.022, env: 0.5 }) },
     screed: { mat: stdMat('#55555b', { rough: 0.68, map: T.screed, bumpMap: T.concBump, bumpScale: 0.012, env: 0.45 }), uvScale: 0.45, w: 'mid' },
     glulam: { mat: stdMat('#8c8c92', { rough: 0.54, map: T.lamH, bumpMap: T.lamHBump, bumpScale: 0.02, env: 0.55 }) },
@@ -37,19 +37,19 @@ export async function build(labels) {
     concrete: { mat: stdMat('#6e6e74', { rough: 0.84, map: T.stipple, bumpMap: T.concBump, bumpScale: 0.025 }) },
     pier: { mat: stdMat('#6e6e74', { rough: 0.84, map: T.stipple, bumpMap: T.concBump, bumpScale: 0.025 }) },
     core: { mat: stdMat('#45454b', { rough: 0.88, map: T.hatch, bumpMap: T.concBump, bumpScale: 0.02 }) },
-    coreWall: { mat: stdMat('#2e2e33', { real: '#e8e2d7', rough: 0.88, bumpMap: T.concBump, bumpScale: 0.014 }) },
-    glass: { mat: stdMat('#dfe6ea', { real: '#c2e8f0', opacity: 0.14, rough: 0.06, env: 0.85 }), cast: false, edges: false },
-    frame: { mat: stdMat('#101012', { real: '#2c2b29', rough: 0.42, metal: 0.45, env: 0.65 }) },
-    desk: { mat: stdMat('#e4e1dc', { real: '#efe7da', rough: 0.52, bumpMap: T.cltBump, bumpScale: 0.008 }), uvScale: 0.8 },
-    chair: { mat: stdMat('#46464c', { real: '#9fb3a0', rough: 0.6 }) , w: 'mid' },
-    green: { mat: stdMat('#2a2e2b', { real: '#9cb57e', rough: 0.92, bumpMap: T.concBump, bumpScale: 0.02 }), uvScale: 0.6 },
-    tree: { mat: stdMat('#dedbd6', { real: '#8daa6e', rough: 1 }), hull: 1, edges: false },
-    leaf: { mat: stdMat('#3b403c', { real: '#7f9e62', rough: 0.88 }), hull: 1, edges: false },
-    figure: { mat: stdMat('#f7f4ee', { real: '#ffffff', side: THREE.DoubleSide }), thr: 20 },
+    coreWall: { mat: stdMat('#2e2e33', { real: '#ece8df', rough: 0.88, bumpMap: T.concBump, bumpScale: 0.014 }) },
+    glass: { mat: stdMat('#dfe6ea', { real: '#c5dadf', opacity: 0.14, rough: 0.06, env: 0.85 }), cast: false, edges: false },
+    frame: { mat: stdMat('#101012', { real: '#2d3033', rough: 0.42, metal: 0.45, env: 0.65 }) },
+    desk: { mat: stdMat('#e4e1dc', { real: '#e0c398', rough: 0.52, bumpMap: T.cltBump, bumpScale: 0.008 }), uvScale: 0.8 },
+    chair: { mat: stdMat('#46464c', { real: '#9aaa90', rough: 0.6 }) , w: 'mid' },
+    green: { mat: stdMat('#2a2e2b', { real: '#8fa46f', rough: 0.92, bumpMap: T.concBump, bumpScale: 0.02 }), uvScale: 0.6 },
+    tree: { mat: stdMat('#dedbd6', { real: '#8fa46f', rough: 1 }), hull: 1, edges: false },
+    leaf: { mat: stdMat('#3b403c', { real: '#9aaa90', rough: 0.88 }), hull: 1, edges: false },
+    figure: { mat: stdMat('#f7f4ee', { real: '#f3f0e9', side: THREE.DoubleSide }), thr: 20 },
   };
   const line = lineMat({ w: 0.8, color: INK, opacity: 0.8 });
-  const ctxLine = lineMat({ w: 0.7, color: '#8b8883', opacity: 0.34 });
-  const joint = lineMat({ w: 0.5, color: '#8b8883', opacity: 0.4 });
+  const ctxLine = lineMat({ w: 0.7, color: '#a9d2f2', opacity: 0.34 });
+  const joint = lineMat({ w: 0.5, color: '#a9d2f2', opacity: 0.4 });
 
   // ---- the city block, as a white card model
   const city = new THREE.Group(); scene.add(city);
@@ -267,7 +267,7 @@ export async function build(labels) {
   }
 
   const C = c => new THREE.Color(c);
-  const W0 = { hemi: C('#ffffff'), ground: C('#8f8f98'), sun: C('#ffffff'), fog: C('#0c0c0e') }, W1 = { hemi: C('#ffffff'), ground: C('#efe2cc'), sun: C('#fff2dc'), fog: C('#cfe4f5') };
+  const W0 = { hemi: C('#ffffff'), ground: C('#8f8f98'), sun: C('#ffffff'), fog: C('#1e4a8c') }, W1 = { hemi: C('#ffffff'), ground: C('#ece8df'), sun: C('#fff2dc'), fog: C('#e7ecef') };
   return {
     update, keys, R: 130,
     // the storeys move while they land (0.06 to 0.30 and 0.70 to 0.90); in between every shadow stands still
@@ -337,7 +337,7 @@ function textures() {
   const rep = (t) => { t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; };
   const r = rng(9);
   const hatch = rep(canvasTex(256, 256, (g, w, h) => {
-    g.fillStyle = '#c4bfb6'; g.fillRect(0, 0, w, h); g.strokeStyle = 'rgba(60,56,50,.55)'; g.lineWidth = 3;
+    g.fillStyle = '#b8b5ad'; g.fillRect(0, 0, w, h); g.strokeStyle = 'rgba(60,56,50,.55)'; g.lineWidth = 3;
     for (let k = -h; k < w + h; k += 32) { g.beginPath(); g.moveTo(k, h); g.lineTo(k + h, 0); g.stroke(); }
   }));
   const concBump = rep(canvasTex(256, 256, (g, w, h) => {
@@ -346,7 +346,7 @@ function textures() {
     for (let i = 0; i < 320; i++) { g.fillStyle = i % 2 ? 'rgba(20,20,20,0.45)' : 'rgba(230,230,230,0.4)'; g.beginPath(); g.arc(r() * w, r() * h, 1 + r() * 2.2, 0, 7); g.fill(); }
   }));
   const stipple = rep(canvasTex(256, 256, (g, w, h) => {
-    g.fillStyle = '#cdc8bf'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#b8b5ad'; g.fillRect(0, 0, w, h);
     for (let y = 0; y < h; y += 32) { g.fillStyle = 'rgba(65,60,54,0.16)'; g.fillRect(0, y, w, 1.5); }
     g.fillStyle = 'rgba(70,66,60,.5)';
     for (let i = 0; i < 260; i++) { g.beginPath(); g.arc(r() * w, r() * h, 1 + r() * 1.6, 0, 7); g.fill(); }
@@ -354,7 +354,7 @@ function textures() {
     for (let i = 0; i < 14; i++) { const x = r() * w, y = r() * h, s = 5 + r() * 5; g.beginPath(); g.moveTo(x, y); g.lineTo(x + s, y + s * 0.4); g.lineTo(x + s * 0.2, y + s); g.closePath(); g.stroke(); }
   }));
   const screed = rep(canvasTex(256, 256, (g, w, h) => {
-    g.fillStyle = '#beb7ab'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#b8b5ad'; g.fillRect(0, 0, w, h);
     for (let i = 0; i < 380; i++) {
       g.fillStyle = i % 2 ? 'rgba(245,240,230,0.22)' : 'rgba(75,70,62,0.20)';
       g.fillRect(r() * w, r() * h, 1.5 + r() * 2.5, 1.5 + r() * 2.5);
@@ -364,7 +364,7 @@ function textures() {
     const cb = document.createElement('canvas'); cb.width = cb.height = 256;
     const gb = cb.getContext('2d');
     const map = rep(canvasTex(256, 256, (g, w, h) => {
-      g.fillStyle = '#d9bb8d'; g.fillRect(0, 0, w, h);
+      g.fillStyle = '#dcc08f'; g.fillRect(0, 0, w, h);
       gb.fillStyle = '#808080'; gb.fillRect(0, 0, w, h);
       for (let k = 0; k < 256; k += 10.24) {
         const tone = (r() - 0.5) * 14;
@@ -393,7 +393,7 @@ function textures() {
   const cltCb = document.createElement('canvas'); cltCb.width = cltCb.height = 512;
   const cltGb = cltCb.getContext('2d');
   const clt = rep(canvasTex(512, 512, (g, w, h) => {
-    g.fillStyle = '#e1d1b2'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#dcc08f'; g.fillRect(0, 0, w, h);
     cltGb.fillStyle = '#808080'; cltGb.fillRect(0, 0, w, h);
     for (let y = 0; y < 512; y += 32) {
       const v = (r() - 0.5) * 12;
@@ -414,10 +414,10 @@ function textures() {
   }));
   const cltBump = rep(new THREE.CanvasTexture(cltCb)); cltBump.anisotropy = 8;
   const larch = rep(canvasTex(256, 256, (g, w, h) => {
-    g.fillStyle = '#c9a476'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#c49a66'; g.fillRect(0, 0, w, h);
     for (let x = 0; x < w; x += 16) {
       const v = (r() - 0.5) * 14;
-      g.fillStyle = `rgb(${Math.round(201 + v)},${Math.round(164 + v * 0.8)},${Math.round(118 + v * 0.6)})`;
+      g.fillStyle = `rgb(${Math.round(196 + v)},${Math.round(154 + v * 0.8)},${Math.round(102 + v * 0.6)})`;
       g.fillRect(x, 0, 16, h);
       g.fillStyle = 'rgba(85,54,28,0.24)'; g.fillRect(x, 0, 1.2, h);
     }

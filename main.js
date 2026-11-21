@@ -183,7 +183,7 @@ function swirl(cs, u) {
   cs.sx = lerp(cs.sx || 0, 0, e); cs.sy = lerp(cs.sy || 0, SW.sy ?? -0.04, e);
 }
 const xfer = $('xfer'), xferK = xfer.querySelector('.xk'), XK0 = xferK?.textContent;
-function setXfer(s) { $('xferNo').textContent = s.no; $('xferName').textContent = s.name; if (xferK) xferK.textContent = s.kicker || XK0; }
+function setXfer(s) { xfer.classList.toggle('vellum', !!s.href); $('xferNo').textContent = s.no; $('xferName').textContent = s.name; if (xferK) xferK.textContent = s.kicker || XK0; }
 // the sheet tabs take the same way out, only quicker
 dirLinks.forEach(a => a.addEventListener('click', e => {
   if (LIVEONLY) return;

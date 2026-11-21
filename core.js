@@ -18,12 +18,13 @@ export const easeOut = t => 1 - Math.pow(1 - t, 3);
 export const win = (p, a, b) => clamp((p - a) / (b - a));
 export const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
-// The sheet is black, the ink is white and the pen is red. Glacier cyan measures, and leads the colour.
-export const INK = '#f1eeea';
-export const PAPER = '#0c0c0e';
-export const ACCENT = '#e5202e';
-export const ACCENT_HI = '#ff4d57';
-export const ACCENT2 = '#43c4d2';
+// Cyanotype: the sheet is Prussian blue, the print lines are white, the pencil is yellow. The pale blue
+// tint is the secondary line (dimensions); the yellow pencil also leads the colour in.
+export const INK = '#f3f6fb';
+export const PAPER = '#1e4a8c';
+export const ACCENT = '#f4b63f';
+export const ACCENT_HI = '#ffd27a';
+export const ACCENT2 = '#a9d2f2';
 
 // W, H: the canvas in CSS pixels (not the window: on a phone the canvas keeps its size while the URL bar slides).
 // dpr: the resolution the governor has chosen. rev counts real resizes, for things that cache a layout.
@@ -36,10 +37,11 @@ export const TEXK = low ? 0.5 : 1, ANISO = low ? 4 : 8;
 export const DRAW = {
   uDraw: { value: 1e5 }, uDrawFill: { value: 1e5 }, uDrawSoft: { value: 1.2 },
   uDrawDir: { value: new THREE.Vector4(0, 1, 0, 0) }, uDrawC: { value: new THREE.Vector3() },
-  uPen: { value: new THREE.Color('#ff3340') },
+  uPen: { value: new THREE.Color('#f4b63f') },
+  uBpLo: { value: new THREE.Color('#163a72') }, uBpHi: { value: new THREE.Color('#3a6db8') },   // the blueprint fills: shade and light
   uWash: { value: 0 },          // 1 = the fills are a light colour wash on paper, as on a drawing
 };
-const DRAW_GLSL = `uniform float uDraw; uniform float uDrawFill; uniform float uDrawSoft; uniform vec4 uDrawDir; uniform vec3 uDrawC; uniform vec3 uPen; uniform float uWash;
+const DRAW_GLSL = `uniform float uDraw; uniform float uDrawFill; uniform float uDrawSoft; uniform vec4 uDrawDir; uniform vec3 uDrawC; uniform vec3 uPen; uniform float uWash; uniform vec3 uBpLo; uniform vec3 uBpHi;
   varying vec3 vWD;
   float drawOrder(vec3 w) { return dot(w, uDrawDir.xyz) + uDrawDir.w * length(w.xz - uDrawC.xz); }
 `;
@@ -47,7 +49,7 @@ const addDraw = (sh) => { Object.assign(sh.uniforms, DRAW); };
 
 // ---------- the colour. Every material keeps its drawn tone and knows its real one. A front (planar, radial or
 // both, with a little noise so it reads like paint soaking into paper) carries the real colours in, a second
-// front carries them out again. The thin band at each front glows in glacier cyan.
+// front carries them out again. The thin band at each front glows in the secondary tint.
 export const LIVE = {
   uInF: { value: -1e5 }, uOutF: { value: -1e5 },
   uInDir: { value: new THREE.Vector4(0, 0, 0, 1) }, uInC: { value: new THREE.Vector3() },
@@ -55,12 +57,12 @@ export const LIVE = {
   uLiveSoft: { value: 2.5 }, uInN: { value: 2 }, uOutN: { value: 2 },
   uLive: { value: 0 },          // how much colour there is overall: sky light, motes, lamps
   uTime: { value: 0 },
-  uEdge: { value: new THREE.Color(ACCENT2) },
+  uEdge: { value: new THREE.Color(ACCENT) },
   uSunDir: { value: new THREE.Vector3(-0.5, 0.55, 0.65).normalize() },
-  uSunCol: { value: new THREE.Color('#fff1da') }, uSkyCol: { value: new THREE.Color('#eaf2fb') }, uBounce: { value: new THREE.Color('#f1e5d1') },
+  uSunCol: { value: new THREE.Color('#fff4e2') }, uSkyCol: { value: new THREE.Color('#dbe7f1') }, uBounce: { value: new THREE.Color('#ece8df') },
   uRoom: { value: new THREE.Vector4(0, 0, 0, 0) }, uRoomY: { value: new THREE.Vector4(0, 0, 0, 0) },
   uFoot: { value: new THREE.Vector4(0, 0, 0, 0) }, uFoot2: { value: new THREE.Vector2(0, 1.5) },
-  uGrass: { value: new THREE.Color('#c3d3a2') }, uGrass2: { value: new THREE.Color('#9db682') },
+  uGrass: { value: new THREE.Color('#8fa46f') }, uGrass2: { value: new THREE.Color('#849965') },
 };
 const addLive = (sh) => { Object.assign(sh.uniforms, LIVE); };
 const LIVE_GLSL = `uniform float uInF; uniform float uOutF; uniform vec4 uInDir; uniform vec3 uInC; uniform vec4 uOutDir; uniform vec3 uOutC;
@@ -126,14 +128,12 @@ function patchFill(m, o = {}) {
     sh.fragmentShader = DRAW_GLSL + LIVE_GLSL + 'uniform float uGrain; uniform float uFlat; uniform vec3 uReal; uniform vec3 uBase; uniform vec4 uIsland; uniform float uIslandMode; varying vec3 vLP; vec2 gLive;\nfloat hash3(vec3 p){ p = fract(p * vec3(443.897, 441.423, 437.195)); p += dot(p, p.yzx + 19.19); return fract((p.x + p.y) * p.z); }\n' + sh.fragmentShader
       .replace('#include <clipping_planes_fragment>', 'if (drawOrder(vWD) > uDrawFill) discard;\n gLive = liveAt(vWD);\n#include <clipping_planes_fragment>')
       .replace('#include <map_fragment>', '#include <map_fragment>\n { vec3 texel = diffuseColor.rgb / max(uBase, vec3(1e-3)); ' + realCode + ' diffuseColor.rgb = mix(diffuseColor.rgb, rc, gLive.x); }'
-        + (o.wash === false ? '' : '\n diffuseColor.rgb = mix(diffuseColor.rgb, mix(mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))), 0.5), vec3(0.115, 0.115, 0.125), 0.4), uWash);')
+        + (o.wash === false ? '' : '\n diffuseColor.rgb = mix(diffuseColor.rgb, mix(mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))), 0.5), uBpLo, 0.4), uWash);')
         + '\n diffuseColor.rgb *= 1.0 + (hash3(floor(vLP * 140.0)) - 0.5) * uGrain * (1.0 - 0.5 * uWash) * (1.0 - 0.6 * gLive.x);');
-    // the night grade: everything settles into neutral greys, and only warm saturated colours survive, as the brand red.
-    // Where the colour has arrived the grade lets go.
-    const grade = o.grade === false ? '' : `{ vec3 gc = gl_FragColor.rgb; float gm = max(gc.r, max(gc.g, gc.b));
-        float gl = dot(gc, vec3(0.2126, 0.7152, 0.0722));
-        float gr = smoothstep(0.56, 0.72, (gc.r - max(gc.g, gc.b)) / max(gm, 1e-4));
-        gl_FragColor.rgb = mix(mix(vec3(gl) * vec3(1.0, 0.995, 1.03), vec3(0.78, 0.016, 0.03) * clamp(gl * 4.6, 0.0, 1.35), gr), mix(gc * 1.12, diffuseColor.rgb * 0.95, uFlat), gLive.x); }`;
+    // the blueprint grade: every drawn fill is a blue wash between shade and light; the real colour takes over where
+    // the front has passed
+    const grade = o.grade === false ? '' : `{ vec3 gc = gl_FragColor.rgb; float gl = dot(gc, vec3(0.2126, 0.7152, 0.0722));
+        gl_FragColor.rgb = mix(mix(uBpLo, uBpHi, smoothstep(0.02, 0.7, gl)), mix(gc * 1.12, diffuseColor.rgb * 0.95, uFlat), gLive.x); }`;
     const island = 'if (uIslandMode > -0.5) { float fd = 1.0 - smoothstep(0.5, 1.0, length((vWD.xz - uIsland.xy) / uIsland.zw)); gl_FragColor.a *= uIslandMode > 0.5 ? gLive.x * fd : mix(1.0, fd, gLive.x); }';
     sh.fragmentShader = sh.fragmentShader.replace('#include <tonemapping_fragment>', grade + '\n gl_FragColor.rgb += uEdge * gLive.y * 0.28;\n' + island + '\n #include <tonemapping_fragment>');
   };
@@ -152,7 +152,7 @@ function patchLine(m, o = {}) {
     // in colour the ink steps back to a fine dark line, as on a coloured presentation drawing
     sh.fragmentShader = DRAW_GLSL + LIVE_GLSL + 'uniform float uLiveK;\n' + sh.fragmentShader.replace('#include <color_fragment>', `{ float k = uDraw - drawOrder(vWD); if (k < 0.0) discard;
         diffuseColor.rgb = mix(uPen, diffuseColor.rgb, smoothstep(0.0, uDrawSoft, k)); }
-      if (uLiveK > 0.0) { vec2 lv = liveAt(vWD) * uLiveK; diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.32, 0.29, 0.26), lv.x) + uEdge * lv.y * 0.6; alpha *= 1.0 - 0.6 * lv.x; }
+      if (uLiveK > 0.0) { vec2 lv = liveAt(vWD) * uLiveK; diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.1, 0.105, 0.11), lv.x) + uEdge * lv.y * 0.6; alpha *= 1.0 - 0.6 * lv.x; }
       #include <color_fragment>`);
   };
   return m;
@@ -177,7 +177,7 @@ export function ensureEnv() {
   const envScene = new THREE.Scene();
   const c = document.createElement('canvas'); c.width = 4; c.height = 256;
   const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 256);
-  gr.addColorStop(0, '#6c6c72'); gr.addColorStop(0.5, '#2c2c30'); gr.addColorStop(1, '#101012');
+  gr.addColorStop(0, '#dbe7f1'); gr.addColorStop(0.5, '#b9bec2'); gr.addColorStop(1, '#8c8a84');
   g.fillStyle = gr; g.fillRect(0, 0, 4, 256);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
   envScene.add(new THREE.Mesh(new THREE.SphereGeometry(40, 24, 12), new THREE.MeshBasicMaterial({ map: t, side: THREE.BackSide })));
@@ -295,6 +295,8 @@ export function toneMat(hex, o = {}) {
         return texture2D(uRealMap, mv * uMapM.x + uMapM.z).rgb;
       }
       #endif
+      // the drawn state is a blue wash: the authored tone only decides how light the fill is
+      vec3 bpTone(vec3 c) { return mix(uBpLo, uBpHi, smoothstep(0.02, 0.7, dot(c, vec3(0.2126, 0.7152, 0.0722)))); }
       float h2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float n2(vec2 p){
         vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
@@ -359,13 +361,13 @@ export function toneMat(hex, o = {}) {
         if (uMode >= 4.5) {
           // Mode 5: architectural triple glazing with diagonal skylight sheen; in colour it holds the sky
           float sheen = smoothstep(0.45, 0.55, sin((vLP.x + vLP.y * 1.35 + vLP.z) * 1.8)) * 0.08;
-          vec3 c0 = uCol * (shade + sheen);
+          vec3 c0 = bpTone(uCol * (shade + sheen));
           vec3 c1 = mix(uReal * (0.9 + 0.1 * top), vec3(1.0), sheen * 3.0);
           gl_FragColor = vec4(mix(c0, c1, lv.x) + uEdge * lv.y * 0.3, mix(uOp, uOpR, lv.x) + sheen * 0.45 + lv.y * 0.12);
           #include <colorspace_fragment>
           return;
         }
-        vec3 col = uCol * (shade + texOf(uMode, p, uv, top) * uTex) + uGlow;
+        vec3 col = bpTone(uCol * (shade + texOf(uMode, p, uv, top) * uTex)) + uGlow;
         if (lv.x > 0.002) {
           vec3 rc = uReal;
           #ifdef REAL_MAP
@@ -724,12 +726,12 @@ export function boxUV(g, scale = 1, along = null) {
 }
 
 // ---------- the world around the drawing. One screen-sized quad behind everything: it casts each pixel's ray,
-// finds the ground or the sky, and shows the black sheet until the colour reaches that point.
+// finds the ground or the sky, and shows the blue sheet until the colour reaches that point.
 const ASPECT = { value: 1 };
 export const ENV = {
   uInvProj: { value: camera.projectionMatrixInverse }, uCamW: { value: camera.matrixWorld }, uCamPos: { value: camera.position },
   uGroundY: { value: 0 }, uPaper: { value: new THREE.Color(PAPER) }, uAspect: ASPECT,
-  uZenith: { value: new THREE.Color('#3b84d4') }, uMid: { value: new THREE.Color('#7fb5ea') }, uHorizon: { value: new THREE.Color('#d9ecfa') },
+  uZenith: { value: new THREE.Color('#dbe7f1') }, uMid: { value: new THREE.Color('#e7ecef') }, uHorizon: { value: new THREE.Color('#f3f1ea') },
 };
 // The colour is not a world but a picture laid over the whole screen, as in an architect's illustration: a clear
 // blue sky, brighter towards the bottom, with soft white clouds drifting across. Where the colour has reached
@@ -753,12 +755,12 @@ export const envMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.S
       vec2 q = vUv, a = vec2(uAspect, 1.0);
       vec3 col = mix(uHorizon, uMid, smoothstep(0.0, 0.6, q.y));
       col = mix(col, uZenith, smoothstep(0.5, 1.08, q.y));
-      col += vec3(1.0, 0.95, 0.85) * 0.16 * exp(-length((q - vec2(0.16, 0.95)) * a) * 2.4);
+      col += vec3(1.0, 0.96, 0.88) * 0.08 * exp(-length((q - vec2(0.16, 0.95)) * a) * 2.4);
       vec2 cp = q * a * vec2(1.25, 3.0) + vec2(uTime * 0.007, 0.0);
       float c = lvN(vec3(cp, 0.0)) * 0.52 + lvN(vec3(cp * 2.2, 1.3)) * 0.3 + lvN(vec3(cp * 4.6, 2.7)) * 0.18;
       float band = smoothstep(0.18, 0.5, q.y) * (1.0 - smoothstep(0.92, 1.0, q.y));
       float cl = smoothstep(0.55, 0.7, c) * band;
-      col = mix(col, mix(vec3(0.78, 0.85, 0.94), vec3(1.0), smoothstep(0.58, 0.78, c)), cl * 0.92);
+      col = mix(col, mix(vec3(0.82, 0.87, 0.93), vec3(1.0), smoothstep(0.58, 0.78, c)), cl * 0.8);
       gl_FragColor = vec4(mix(uPaper, col, lv.x) + uEdge * lv.y * 0.22, 1.0);
       #include <colorspace_fragment>
     }`,
@@ -767,10 +769,10 @@ export const envMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.S
 envMesh.frustumCulled = false; envMesh.renderOrder = -1000; scene.add(envMesh);
 
 // ---------- transitions between the sheets: a screen quad over everything. 1 wipe, 2 iris, 3 blinds, 4 dissolve.
-// t = 0 shows the drawing, t = 1 covers it. Every edge is drawn in glacier cyan.
+// t = 0 shows the drawing, t = 1 covers it. Every edge is drawn in the secondary tint.
 export const FX = {
   uMode: { value: 0 }, uT: { value: 0 }, uC: { value: new THREE.Vector2(0.5, 0.5) }, uDir: { value: new THREE.Vector2(0, 1) },
-  uAspect: ASPECT, uCover: { value: new THREE.Color('#050506') }, uFxEdge: { value: new THREE.Color(ACCENT2) }, uFxTime: { value: 0 },
+  uAspect: ASPECT, uCover: { value: new THREE.Color('#163a72') }, uFxEdge: { value: new THREE.Color(ACCENT) }, uFxTime: { value: 0 },
 };
 export const fxMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
   uniforms: FX,
@@ -848,7 +850,7 @@ export function motes(o) {
   return pts;
 }
 
-// ---------- dimensions: a dimension line with extension lines and ticks in glacier cyan, riding with its part,
+// ---------- dimensions: a dimension line with extension lines and ticks in the secondary tint, riding with its part,
 // and its figure set along the line in the page font
 const DPA = new THREE.Vector3(), DPB = new THREE.Vector3();
 export class Dims {

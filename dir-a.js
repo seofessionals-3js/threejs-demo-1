@@ -63,49 +63,49 @@ function slope(side, x0, x1, w0, w1, z0, tEnd) {
 }
 
 export async function build(labels, dims) {
-  const dk = lineMat({ w: 0.95, color: '#151517', opacity: 0.9 });       // ink for the light things
-  const light = { line: dk, hullColor: '#151517' };
+  const dk = lineMat({ w: 0.95, color: '#a9d2f2', opacity: 0.9 });       // the tint line for the light things
+  const light = { line: dk, hullColor: '#a9d2f2' };
   // every material has its drawn tone and, after "real", the surface it has when the house comes alive: warm
   // oiled oak boards on the floors, the ceilings and all round the outside, white plaster and white painted brick
   // inside, white joinery, a cream rug with a black lattice, light zinc on top, warm lamps
   const swayLine = lineMat({ w: 0.9, sway: 0.016 });
-  const TX = { planks: oakPlanks(), pale: oakPlanks({ seed: 7, base: [226, 204, 174], seams: 0.3 }), deck: oakPlanks({ seed: 11, w: 0.14, tile: 2.24, base: [196, 162, 124], seams: 0.6 }), board: oakBoard(), brick: whiteBrick(), rug: latticeRug() };
+  const TX = { planks: oakPlanks(), pale: oakPlanks({ seed: 7, base: [224, 195, 152], seams: 0.3 }), deck: oakPlanks({ seed: 11, w: 0.14, tile: 2.24, base: [196, 154, 102], seams: 0.6 }), board: oakBoard(), brick: whiteBrick(), rug: latticeRug() };
   const wood = (t, m, o = {}) => ({ real: '#ffffff', realMap: t, mapM: m, realTex: 0, ...o });
   const PAL = {
-    wall: { mat: toneMat('#26262a', { mode: 0, scale: 1.0, tex: 1.6, real: '#f4f1ec', realMode: 0, realTex: 1.0 }) },
+    wall: { mat: toneMat('#26262a', { mode: 0, scale: 1.0, tex: 1.6, real: '#f3f0e9', realMode: 0, realTex: 1.0 }) },
     ceil: { mat: toneMat('#2c2c30', { mode: 1, scale: 0.9, tex: 1.4, ...wood(TX.pale, 2.28) }) },
     floor: { mat: toneMat('#3f3b37', { mode: 1, scale: 1.2, ...wood(TX.planks, 2.28) }) },
     deck: { mat: toneMat('#2a2826', { mode: 1, scale: 1.8, ...wood(TX.deck, 2.24, { mapRot: 1 }) }) },
-    pool: { mat: toneMat('#8a8178', { mode: 0, opacity: 0.22, tex: 0, real: '#ffe6b8', realOp: 0.16 }), edges: false },
-    firepool: { mat: toneMat('#c02a2a', { mode: 0, opacity: 0.11, tex: 0, real: '#ffb27a', realOp: 0.14 }), edges: false },
+    pool: { mat: toneMat('#8a8178', { mode: 0, opacity: 0.22, tex: 0, real: '#c5dadf', realOp: 0.16 }), edges: false },
+    firepool: { mat: toneMat('#c02a2a', { mode: 0, opacity: 0.11, tex: 0, real: '#e0c398', realOp: 0.14 }), edges: false },
     oak: { mat: toneMat('#57514b', { mode: 1, scale: 1.6, ...wood(TX.board, 0.9) }) },
-    concrete: { mat: toneMat('#58585d', { mode: 2, scale: 1.0, tex: 1.8, real: '#ebe7e0', realTex: 1.0 }) },
+    concrete: { mat: toneMat('#58585d', { mode: 2, scale: 1.0, tex: 1.8, real: '#ece8df', realTex: 1.0 }) },
     brick: { mat: toneMat('#58585d', { mode: 2, scale: 1.0, tex: 1.8, ...wood(TX.brick, 1.2) }) },
-    glass: { mat: toneMat('#e6ecf0', { opacity: 0.085, mode: 5, real: '#c2e8f0', realOp: 0.34 }) },
+    glass: { mat: toneMat('#e6ecf0', { opacity: 0.085, mode: 5, real: '#c5dadf', realOp: 0.34 }) },
     clad: { mat: toneMat('#161618', { mode: 1, scale: 2.2, tex: 3.2, ...wood(TX.board, 1.2) }), w: 'thin' },
-    seam: { mat: toneMat('#1c1c1f', { mode: 3, scale: 1.5, tex: 3.0, real: '#d3cdc2', realTex: 1.6 }), w: 'thin' },
+    seam: { mat: toneMat('#1c1c1f', { mode: 3, scale: 1.5, tex: 3.0, real: '#5f6a73', realTex: 1.6 }), w: 'thin' },
     under: { mat: toneMat('#34343a', { mode: 1, scale: 1.0, tex: 1.6, ...wood(TX.pale, 2.28) }) },
-    rafter: { mat: toneMat('#6a645d', { mode: 1, scale: 2.0, ...wood(TX.board, 1.2, { real: '#fff3e0', mapRot: 1 }) }), w: 'mid' },
-    steel: { mat: toneMat('#2b2b30', { mode: 3, scale: 2.0, real: '#3e4145' }), w: 'thin' },
-    pipe: { mat: toneMat('#222226', { mode: 3, scale: 2.0, real: '#3a3c3f' }), w: 'thin', hull: 1 },
-    rod: { mat: toneMat('#3a3a40', { mode: 3, scale: 2.0, tex: 1, real: '#4a4d51' }), edges: false, hull: 0.8 },
-    kfront: { mat: toneMat('#19191c', { mode: 0, scale: 1.0, tex: 1.2, real: '#f2efe9', realTex: 0.6 }) },
-    bright: { mat: toneMat('#e7e4df', { mode: 0, tex: 0.9, real: '#f8f4ec', realMode: 2, realTex: 0.6 }), ...light },
-    leaf: { mat: toneMat('#2b2f2c', { side: THREE.DoubleSide, mode: 0, real: '#8aa66c', sway: 0.016 }), line: swayLine, thr: 20 },
-    frame: { mat: toneMat('#17171a', { mode: 1, scale: 2.0, real: '#2e2e2f' }) },
-    redframe: { mat: toneMat('#c8141f', { mode: 3, scale: 2.0, tex: 1.2, real: '#2e2e2f' }) },
+    rafter: { mat: toneMat('#6a645d', { mode: 1, scale: 2.0, ...wood(TX.board, 1.2, { real: '#e0c398', mapRot: 1 }) }), w: 'mid' },
+    steel: { mat: toneMat('#2b2b30', { mode: 3, scale: 2.0, real: '#2d3033' }), w: 'thin' },
+    pipe: { mat: toneMat('#222226', { mode: 3, scale: 2.0, real: '#2d3033' }), w: 'thin', hull: 1 },
+    rod: { mat: toneMat('#3a3a40', { mode: 3, scale: 2.0, tex: 1, real: '#4b5257' }), edges: false, hull: 0.8 },
+    kfront: { mat: toneMat('#19191c', { mode: 0, scale: 1.0, tex: 1.2, real: '#f3f0e9', realTex: 0.6 }) },
+    bright: { mat: toneMat('#e7e4df', { mode: 0, tex: 0.9, real: '#f3f0e9', realMode: 2, realTex: 0.6 }), ...light },
+    leaf: { mat: toneMat('#2b2f2c', { side: THREE.DoubleSide, mode: 0, real: '#8fa46f', sway: 0.016 }), line: swayLine, thr: 20 },
+    frame: { mat: toneMat('#17171a', { mode: 1, scale: 2.0, real: '#2d3033' }) },
+    redframe: { mat: toneMat('#b8914a', { mode: 3, scale: 2.0, tex: 1.2, real: '#c9973a' }) },
     rug: { mat: toneMat('#4b4b51', { mode: 4, scale: 1.0, tex: 1.8, ...wood(TX.rug, 1.2, { realTex: 0.8 }) }) },
-    soft: { mat: toneMat('#dcd9d3', { mode: 4, scale: 1.0, tex: 0.9, real: '#f7f3ec' }), hull: 1, ...light },
-    cushion: { mat: toneMat('#e2dfd9', { mode: 4, scale: 1.4, tex: 0.9, real: '#f4efe7' }), hull: 1, thr: 50, ...light },
-    rouge: { mat: toneMat('#cc1f2b', { mode: 4, scale: 1.4, tex: 1.3, real: '#c9a074' }), hull: 1, thr: 50, ...light },
-    shade: { mat: toneMat('#fff3e2', { mode: 4, scale: 1.5, tex: 0.5, glow: '#262019', real: '#fff6e6', realGlow: '#8a6a3e' }), hull: 1, ...light },
-    ember: { mat: toneMat('#ff3526', { mode: 0, tex: 0, glow: '#3a0603', real: '#ff7a24', realGlow: '#c2400c' }), edges: false },
-    book1: { mat: toneMat('#c81e2a', { mode: 0, tex: 1, real: '#c6a67e' }), w: 'thin' },
-    book2: { mat: toneMat('#e7e4df', { mode: 0, tex: 1, real: '#f2ede3' }), w: 'thin', ...light },
-    book3: { mat: toneMat('#6c6c72', { mode: 0, tex: 1, real: '#93abbb' }), w: 'thin' },
+    soft: { mat: toneMat('#dcd9d3', { mode: 4, scale: 1.0, tex: 0.9, real: '#e9e2d2' }), hull: 1, ...light },
+    cushion: { mat: toneMat('#e2dfd9', { mode: 4, scale: 1.4, tex: 0.9, real: '#e9e2d2' }), hull: 1, thr: 50, ...light },
+    rouge: { mat: toneMat('#7c8a73', { mode: 4, scale: 1.4, tex: 1.3, real: '#9aaa90' }), hull: 1, thr: 50, ...light },
+    shade: { mat: toneMat('#fff3e2', { mode: 4, scale: 1.5, tex: 0.5, glow: '#262019', real: '#f3f0e9', realGlow: '#8a6a2a' }), hull: 1, ...light },
+    ember: { mat: toneMat('#d9a443', { mode: 0, tex: 0, glow: '#2a1f08', real: '#c9973a', realGlow: '#a87a22' }), edges: false },
+    book1: { mat: toneMat('#b08a58', { mode: 0, tex: 1, real: '#c49a66' }), w: 'thin' },
+    book2: { mat: toneMat('#e7e4df', { mode: 0, tex: 1, real: '#f3f0e9' }), w: 'thin', ...light },
+    book3: { mat: toneMat('#6c6c72', { mode: 0, tex: 1, real: '#9aaa90' }), w: 'thin' },
   };
-  const flameMat = toneMat('#ff4a2c', { mode: 0, tex: 0, glow: '#4a0a05', side: THREE.DoubleSide, opacity: 0.92, real: '#ffb347', realGlow: '#ff6a10' });
-  const hatchMat = lineMat({ w: 0.6, color: '#8b8883', opacity: 0.62 });
+  const flameMat = toneMat('#e0b050', { mode: 0, tex: 0, glow: '#2a1f08', side: THREE.DoubleSide, opacity: 0.92, real: '#e0c398', realGlow: '#c9973a' });
+  const hatchMat = lineMat({ w: 0.6, color: '#a9d2f2', opacity: 0.5 });
   const dashMat = lineMat({ w: 0.9, color: INK, dashed: true, dash: 0.22, gap: 0.2, opacity: 0.7 });
 
   // ---- the plan the house stands on
@@ -500,7 +500,7 @@ export async function build(labels, dims) {
       L6.part.add('shade', ball(r, x, y0 - r + 0.02, 0, 3));
     }
   }
-  const L7 = layer('roof', '07', 'Dach', 'Dämmpaneele, Zink-Stehfalz schwarz', 5);
+  const L7 = layer('roof', '07', 'Dach', 'Dämmpaneele, Zink-Stehfalz', 5);
   {
     const tS = (0.2 - 0.44 * SP) / CP;                 // where the standing seams start, clear of the ridge cap
     for (const side of [1, -1]) {
@@ -521,7 +521,7 @@ export async function build(labels, dims) {
 
   for (const L of layers) { L.part.build(); for (const s of L.subs) s.part.build(); }
 
-  // ---- the roof, measured: what it is built from and how big, in glacier cyan, riding with each floating layer.
+  // ---- the roof, measured: what it is built from and how big, in the secondary tint, riding with each floating layer.
   // A point on the south slope: x along the ridge, w square off the rafter line, t down the slope from the ridge.
   const PS = (x, w, t) => V(x, Y0 + w * CP - t * SP, w * SP + t * CP);
   const SLD = V(0, -SP, CP), SLN = V(0, CP, SP);
@@ -537,7 +537,7 @@ export async function build(labels, dims) {
     dims.panel('roof', L7.g, PS(-XR - 0.02, 0.33, T + 0.035), `
       <div class="dp-h"><i>07 + 06</i>Dachaufbau · von außen</div>
       <table>
-        <tr><td>0,7</td><td>Zink-Stehfalz schwarz · Falz 40 · e 450</td></tr>
+        <tr><td>0,7</td><td>Zink-Stehfalz · Falz 40 · e 450</td></tr>
         <tr><td>—</td><td>Strukturierte Trennlage</td></tr>
         <tr><td>200</td><td>Holzfaser-Dämmpaneel λ 0,040</td></tr>
         <tr><td>220</td><td>Sparren KVH 80/220 · e 600</td></tr>
@@ -715,7 +715,7 @@ export async function build(labels, dims) {
       room: [XW + 0.03, XE - 0.03, -ZO + 0.03, ZO - 0.03], roomY: [-0.5, YP + PL + 0.12, TP, 1],
       foot: [XW - 0.06, -ZO - 0.06, XE + 0.06, ZO + 0.06], foot2: [3.2, 1.8],
       groundY: -0.02,
-      motes: { n: 300, min: [-4.7, 0.5, -3.3], max: [4.7, 7.4, 3.3], size: 0.018, color: '#fff3dc' },
+      motes: { n: 300, min: [-4.7, 0.5, -3.3], max: [4.7, 7.4, 3.3], size: 0.018, color: '#f3f0e9' },
     },
     // in: the sheet is uncovered from the bottom up, the way it is plotted; out: it breaks up into cells
     xfer: { in: { mode: 'wipe', dir: [0, -1] }, out: { mode: 'dissolve' } },

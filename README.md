@@ -1,4 +1,7 @@
-# three.js Demo 1
+# three.js Demo 7
+
+In der Übersicht und in der durchlaufenden Schau ist das die Nummer 7; das Repository heißt weiter `threejs-demo-1`, damit alle Adressen gültig bleiben. Am Ende der drei Blätter übergibt es selbst an Nummer 1, den Wohnungsfinder.
+
 
 Eine Explosionsaxonometrie eines zweigeschossigen Hauses, als weiße Linien auf ein preußischblaues Blatt geplottet, wie eine Blaupause. Beim Scrollen landen die sieben Schichten nacheinander in Bauabfolge. Dann weitet sich das Objektiv, bis die Zeichnung zum Raum wird, die große Glasschiebetür gleitet auf, und Sie gehen hinein, die Treppe hinauf und bis unter den First.
 

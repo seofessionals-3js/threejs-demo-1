@@ -6,7 +6,7 @@
 // the two near walls drop, and the room stands there as a cutaway model.
 import {
   THREE, Part, bx, cyl, ball, beam, panel, M, V, clamp, lerp, ease, win,
-  scene, renderer, camera, lineMat, stdMat, eyeKey, canvasTex, rng, DRAW, patchFill, INK, segs,
+  scene, renderer, camera, lineMat, stdMat, eyeKey, canvasTex, rng, DRAW, patchFill, INK, segs, low, high, TEXK,
 } from './core.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
@@ -15,7 +15,7 @@ const NZ = -OZ - H;                           // where the top of the window wal
 // a soft box: cushions, upholstery
 function rb(x0, y0, z0, x1, y1, z1, r = 0.04) {
   const w = Math.abs(x1 - x0), h = Math.abs(y1 - y0), d = Math.abs(z1 - z0);
-  const g = new RoundedBoxGeometry(w, h, d, 4, Math.min(r, Math.min(w, h, d) / 2 - 0.002));
+  const g = new RoundedBoxGeometry(w, h, d, low && r >= 0.03 ? 3 : 4, Math.min(r, Math.min(w, h, d) / 2 - 0.002));
   g.translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); return g;
 }
 // turn a piece about a point
@@ -66,7 +66,9 @@ function blooms(part, x, y0, z, h, n, key = 'bloom', seed = 3) {
 }
 
 export async function build(labels) {
-  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  // the shadow map is only redrawn when a wall, the door or the sun has moved (shadowKey below)
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = low ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+  renderer.shadowMap.autoUpdate = false;
   const hemi = new THREE.HemisphereLight('#ffffff', '#8f8f98', 2.3); scene.add(hemi);
   // a pendant over the middle of the room while you are inside
   const lamp = new THREE.SpotLight('#fff3e6', 0, 4.4, 0.7, 0.35, 1.2);
@@ -80,7 +82,7 @@ export async function build(labels) {
   const SUN_C = V(7.5, 17, -4.5);   // high and soft: both walls of the cutaway read bright, as in a studio render
   let swK = 0;
   const sun = new THREE.DirectionalLight('#ffffff', 2.6);
-  sun.position.copy(SUN_A); sun.castShadow = true; sun.shadow.mapSize.set(4096, 4096);
+  sun.position.copy(SUN_A); sun.castShadow = true; sun.shadow.mapSize.setScalar(high ? 4096 : 2048);
   Object.assign(sun.shadow.camera, { left: -13, right: 13, top: 13, bottom: -13, near: 1, far: 45 });
   sun.shadow.bias = -0.0003; sun.shadow.normalBias = 0.025; sun.shadow.radius = 3; sun.target.position.set(0, 0, -1.5);
   scene.add(sun, sun.target);
@@ -91,43 +93,44 @@ export async function build(labels) {
   studio.position.y = -0.13; studio.renderOrder = -5; scene.add(studio);
 
   const T = buildTextures();
-  const art = (map) => ({ mat: stdMat('#ffffff', { map, bumpMap: T.fabricBump, bumpScale: 0.006, rough: 0.8, flat: 0.7 }) });
-  const book = (c) => ({ mat: stdMat(c, { rough: 0.7 }), w: 'mid' });
+  // prints flat on the wall and the books on their shelves throw no shadow worth drawing
+  const art = (map) => ({ mat: stdMat('#ffffff', { map, bumpMap: T.fabricBump, bumpScale: 0.006, rough: 0.8, flat: 0.7 }), cast: false });
+  const book = (c) => ({ mat: stdMat(c, { rough: 0.7 }), w: 'mid', cast: false });
   const PAL = {
-    plaster: { mat: stdMat('#2b2b30', { real: '#eceae6', rough: 0.92, map: T.plaster, bumpMap: T.plasterBump, bumpScale: 0.004, flat: 0.75 }), uvScale: 0.35 },
-    ceiling: { mat: stdMat('#303035', { real: '#d2cec8', rough: 0.92, map: T.plaster, bumpMap: T.plasterBump, bumpScale: 0.003, emissive: '#1c1c20', emissiveIntensity: 0.22, flat: 0.75 }), uvScale: 0.35 },
-    base: { mat: stdMat('#1b1b1e', { real: '#d3d0cb', rough: 0.88, bumpMap: T.plasterBump, bumpScale: 0.005, flat: 0.7 }), uvScale: 0.5 },
-    brick: { mat: stdMat('#34343a', { real: '#f3f1ed', map: T.brick.map, bumpMap: T.brick.bump, bumpScale: 0.03, rough: 0.9, flat: 0.7 }), uvScale: 1 / 0.96, thr: 60 },
-    floor: { mat: stdMat('#5c5c62', { real: '#ecebe8', map: T.floor.map, bumpMap: T.floor.bump, bumpScale: 0.012, rough: 0.55, env: 0.45, flat: 0.1 }), thr: 60 },
+    plaster: { mat: stdMat('#2b2b30', { real: '#f3f0e9', rough: 0.92, map: T.plaster, bumpMap: T.plasterBump, bumpScale: 0.004, flat: 0.75 }), uvScale: 0.35 },
+    ceiling: { mat: stdMat('#303035', { real: '#ece8df', rough: 0.92, map: T.plaster, bumpMap: T.plasterBump, bumpScale: 0.003, emissive: '#1c1c20', emissiveIntensity: 0.22, flat: 0.75 }), uvScale: 0.35 },
+    base: { mat: stdMat('#1b1b1e', { real: '#ece8df', rough: 0.88, bumpMap: T.plasterBump, bumpScale: 0.005, flat: 0.7 }), uvScale: 0.5 },
+    brick: { mat: stdMat('#34343a', { real: '#ece8df', map: T.brick.map, bumpMap: T.brick.bump, bumpScale: 0.03, rough: 0.9, flat: 0.7 }), uvScale: 1 / 0.96, thr: 60 },
+    floor: { mat: stdMat('#5c5c62', { real: '#ece8df', map: T.floor.map, bumpMap: T.floor.bump, bumpScale: 0.012, rough: 0.55, env: 0.45, flat: 0.1 }), thr: 60 },
     oak: { mat: stdMat('#7c7c82', { map: T.oak.map, bumpMap: T.oak.bump, bumpScale: 0.014, rough: 0.56, env: 0.45, flat: 0.3 }), uvScale: 0.8 },
     woodL: { mat: stdMat('#9a9aa0', { map: T.birch.map, bumpMap: T.birch.bump, bumpScale: 0.01, rough: 0.6, env: 0.4, flat: 0.4 }), uvScale: 0.8 },
-    white: { mat: stdMat('#d2d2d6', { real: '#d9d8d5', rough: 0.5, env: 0.5, flat: 0.45 }) },
-    sofa: { mat: stdMat('#dcd9d4', { real: '#f2f1ee', rough: 0.94, bumpMap: T.fabricBump, bumpScale: 0.02, flat: 0.4 }), uvScale: 2.2, hull: 1, thr: 50 },
-    pillow: { mat: stdMat('#c2202b', { real: '#dcdddd', rough: 0.9, bumpMap: T.fabricBump, bumpScale: 0.022, flat: 0.45 }), uvScale: 2.2, hull: 1, thr: 50 },
-    chair: { mat: stdMat('#dcd9d4', { real: '#d2d1cf', rough: 0.92, bumpMap: T.fabricBump, bumpScale: 0.02, flat: 0.4 }), uvScale: 2.2, hull: 1, thr: 50 },
-    ink: { mat: stdMat('#0f0f11', { real: '#26272a', rough: 0.42, metal: 0.3 }) },
-    alu: { mat: stdMat('#8e8e94', { real: '#c9cbcd', rough: 0.34, metal: 0.5, env: 0.7 }) },
-    screen: { mat: stdMat('#e9e9ee', { real: '#f1f2f3', rough: 0.2, env: 0.6, emissive: '#2a2a2e', emissiveIntensity: 0.5, flat: 0.8 }) },
-    frame: { mat: stdMat('#141416', { real: '#24221f', rough: 0.5, metal: 0.2 }) },
-    glass: { mat: stdMat('#dfe6ea', { real: '#e3ecef', opacity: 0.16, rough: 0.08, env: 0.8 }), cast: false, edges: false },
+    white: { mat: stdMat('#d2d2d6', { real: '#f3f0e9', rough: 0.5, env: 0.5, flat: 0.45 }) },
+    sofa: { mat: stdMat('#dcd9d4', { real: '#e9e2d2', rough: 0.94, bumpMap: T.fabricBump, bumpScale: 0.02, flat: 0.4 }), uvScale: 2.2, hull: 1, thr: 50 },
+    pillow: { mat: stdMat('#b8914a', { real: '#9aaa90', rough: 0.9, bumpMap: T.fabricBump, bumpScale: 0.022, flat: 0.45 }), uvScale: 2.2, hull: 1, thr: 50 },
+    chair: { mat: stdMat('#dcd9d4', { real: '#9aaa90', rough: 0.92, bumpMap: T.fabricBump, bumpScale: 0.02, flat: 0.4 }), uvScale: 2.2, hull: 1, thr: 50 },
+    ink: { mat: stdMat('#0f0f11', { real: '#2d3033', rough: 0.42, metal: 0.3 }) },
+    alu: { mat: stdMat('#8e8e94', { real: '#5f6a73', rough: 0.34, metal: 0.5, env: 0.7 }) },
+    screen: { mat: stdMat('#e9e9ee', { real: '#f3f0e9', rough: 0.2, env: 0.6, emissive: '#2a2a2e', emissiveIntensity: 0.5, flat: 0.8 }) },
+    frame: { mat: stdMat('#141416', { real: '#2d3033', rough: 0.5, metal: 0.2 }) },
+    glass: { mat: stdMat('#dfe6ea', { real: '#c5dadf', opacity: 0.16, rough: 0.08, env: 0.8 }), cast: false, edges: false },
     rug: { mat: stdMat('#a0a0a0', { map: T.rug.map, bumpMap: T.rug.bump, bumpScale: 0.03, rough: 0.95, flat: 0.25 }), thr: 60 },
-    blind: { mat: stdMat('#c9c9ce', { real: '#cdcdcc', rough: 0.9, bumpMap: T.fabricBump, bumpScale: 0.008, flat: 0.6 }), uvScale: 3 },
-    shade: { mat: stdMat('#fff8ee', { real: '#f4efe6', emissive: '#f2ece2', emissiveIntensity: 0.4, bumpMap: T.fabricBump, bumpScale: 0.01 }), uvScale: 1.5, hull: 1, edges: false },
-    leaf: { mat: stdMat('#2f3431', { real: '#6f7653', sway: 0.008, rough: 0.8, side: THREE.DoubleSide, flat: 0.45 }), w: 'mid', thr: 20 },
-    leaf2: { mat: stdMat('#3a403c', { real: '#59653f', sway: 0.008, rough: 0.8, side: THREE.DoubleSide, flat: 0.45 }), w: 'mid', thr: 20 },
-    stem: { mat: stdMat('#3a3a3e', { real: '#6b5a40', rough: 0.85 }), w: 'mid' },
-    pot: { mat: stdMat('#d6d3ce', { real: '#d6d5d2', rough: 0.6, flat: 0.45 }), hull: 1 },
-    potD: { mat: stdMat('#3a3a3e', { real: '#3b3b3c', rough: 0.6 }), hull: 1 },
-    terra: { mat: stdMat('#c2202b', { real: '#b98564', rough: 0.85 }), hull: 1 },
-    wicker: { mat: stdMat('#8a8a90', { real: '#b08b5c', rough: 0.95, bumpMap: T.fabricBump, bumpScale: 0.05 }), uvScale: 5, hull: 1, thr: 50 },
-    pink: { mat: stdMat('#c2202b', { real: '#c9ada3', rough: 0.7 }), thr: 50 },
-    tan: { mat: stdMat('#a8a8ae', { real: '#c3a27c', rough: 0.75 }), hull: 1, thr: 40 },
-    vaseY: { mat: stdMat('#d6d3ce', { real: '#dcc98f', rough: 0.6 }), hull: 1 },
-    bloom: { mat: stdMat('#c2202b', { real: '#d9a2a6', rough: 0.9 }), edges: false },
-    bloomW: { mat: stdMat('#e6e6ea', { real: '#e8e2d6', rough: 0.9 }), edges: false },
-    slipper: { mat: stdMat('#8a8a90', { real: '#b89468', rough: 0.9 }), thr: 50 },
+    blind: { mat: stdMat('#c9c9ce', { real: '#e9e2d2', rough: 0.9, bumpMap: T.fabricBump, bumpScale: 0.008, flat: 0.6 }), uvScale: 3 },
+    shade: { mat: stdMat('#fff8ee', { real: '#f3f0e9', emissive: '#f2ece2', emissiveIntensity: 0.4, bumpMap: T.fabricBump, bumpScale: 0.01 }), uvScale: 1.5, hull: 1, edges: false },
+    leaf: { mat: stdMat('#2f3431', { real: '#8fa46f', sway: 0.008, rough: 0.8, side: THREE.DoubleSide, flat: 0.45 }), w: 'mid', thr: 20 },
+    leaf2: { mat: stdMat('#3a403c', { real: '#9aaa90', sway: 0.008, rough: 0.8, side: THREE.DoubleSide, flat: 0.45 }), w: 'mid', thr: 20 },
+    stem: { mat: stdMat('#3a3a3e', { real: '#c49a66', rough: 0.85 }), w: 'mid' },
+    pot: { mat: stdMat('#d6d3ce', { real: '#ece8df', rough: 0.6, flat: 0.45 }), hull: 1 },
+    potD: { mat: stdMat('#3a3a3e', { real: '#4b5257', rough: 0.6 }), hull: 1 },
+    terra: { mat: stdMat('#b8914a', { real: '#c9973a', rough: 0.85 }), hull: 1 },
+    wicker: { mat: stdMat('#8a8a90', { real: '#c49a66', rough: 0.95, bumpMap: T.fabricBump, bumpScale: 0.05 }), uvScale: 5, hull: 1, thr: 50 },
+    pink: { mat: stdMat('#b8914a', { real: '#e9e2d2', rough: 0.7 }), thr: 50 },
+    tan: { mat: stdMat('#a8a8ae', { real: '#e0c398', rough: 0.75 }), hull: 1, thr: 40 },
+    vaseY: { mat: stdMat('#d6d3ce', { real: '#e0c398', rough: 0.6 }), hull: 1 },
+    bloom: { mat: stdMat('#b8914a', { real: '#e9e2d2', rough: 0.9 }), edges: false },
+    bloomW: { mat: stdMat('#e6e6ea', { real: '#f3f0e9', rough: 0.9 }), edges: false },
+    slipper: { mat: stdMat('#8a8a90', { real: '#c49a66', rough: 0.9 }), thr: 50 },
     poster: art(T.poster), tapestry: art(T.tapestry), quote: art(T.quote), artY: art(T.artY), artC: art(T.artC), artD: art(T.artD),
-    b1: book('#a14a33'), b2: book('#2f4b5e'), b3: book('#d9c8a1'), b4: book('#c9a3a0'), b5: book('#e6e1d8'),
+    b1: book('#c49a66'), b2: book('#4b5257'), b3: book('#e0c398'), b4: book('#9aaa90'), b5: book('#f3f0e9'),
   };
   const line = lineMat({ w: 0.95, color: INK, opacity: 0.88 });
   const W = { mid: lineMat({ w: 0.6, color: INK, opacity: 0.6 }) };
@@ -400,7 +403,7 @@ export async function build(labels) {
     lid: [[LX + 0.2, NZ - lz - 0.2, 'PD-06']],
   };
   update(0); scene.updateMatrixWorld(true);
-  const SH = { x0: -8.6, z0: -11.6, w: 17.2, d: 18.4, s: 150 };
+  const SH = { x0: -8.6, z0: -11.6, w: 17.2, d: 18.4, s: 150 };     // the sheet at 150 px per metre (canvasTex halves it on a phone)
   const dots = Object.values(CODE).flat(), pend = [LX, NZ - lz];
   const panelTex = drawSheet(SH, 'panel', dots, pend), groundTex = drawSheet(SH, 'ground', dots, pend);
   const decalMat = (map, a, b) => { const m = patchFill(new THREE.MeshBasicMaterial({ map, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }), { wash: false }); sheets.push([m, a, b]); return m; };
@@ -472,9 +475,11 @@ export async function build(labels) {
   decal(groundMat, SH.x0, SH.z0, SH.x0 + SH.w, SH.z0 + SH.d, 0.16, null);
 
   const C = c => new THREE.Color(c);
-  const W0 = { hemi: C('#ffffff'), ground: C('#8f8f98'), sun: C('#ffffff'), sh: C('#000000') }, W1 = { hemi: C('#ffffff'), ground: C('#dedcd9'), sun: C('#fff4e4'), sh: C('#5a7f96') };
+  const W0 = { hemi: C('#ffffff'), ground: C('#8f8f98'), sun: C('#ffffff'), sh: C('#000000') }, W1 = { hemi: C('#ffffff'), ground: C('#dedcd9'), sun: C('#fff4e4'), sh: C('#7d848a') };
   return {
     update, keys, R: 40,
+    // what can move a shadow: the folding and growing (0.06 to 0.56), the sun coming round, the door, the cutaway
+    shadowKey: (p, sw) => `${clamp(p, 0.06, 0.85).toFixed(4)}|${sw.toFixed(3)}`,
     // daylight pours in through the window and fills the room, the box and the studio floor around it;
     // at the end it leaves the way it came, back out through the window
     live: {
@@ -485,13 +490,13 @@ export async function build(labels) {
       out: { dir: [0, 0, 0], radial: -1, c: [0.2, 1.5, -2.4], min: -27, max: 0.6, noise: 1.2, dur: 1.3, pow: 0.5, delay: 2.9 },
       sun: [0.62, 0.55, -0.56], groundY: -0.125,
       // a photo studio, not a garden: a pale seamless backdrop
-      zenith: '#c9c8c5', mid: '#cfcdc9', horizon: '#d3d1cd',
-      motes: { n: 140, min: [-2.3, 0.15, -2.3], max: [2.3, 2.8, 2.3], size: 0.01, color: '#fff2da' },
+      zenith: '#dbe7f1', mid: '#e7ecef', horizon: '#f3f1ea',
+      motes: { n: 140, min: [-2.3, 0.15, -2.3], max: [2.3, 2.8, 2.3], size: 0.01, color: '#f3f0e9' },
     },
     liveHook: (g) => {
       hemi.color.copy(W0.hemi).lerp(W1.hemi, g); hemi.groundColor.copy(W0.ground).lerp(W1.ground, g);
       // in colour the light is modelled: a soft ambient and a clear sun, so shade reads as shade
-      sun.color.copy(W0.sun).lerp(W1.sun, g); sun.intensity = lerp(2.6, 2.3 - 0.5 * swK, g); hemi.intensity = lerp(2.3, 1.45 + 0.85 * swK, g);
+      sun.color.copy(W0.sun).lerp(W1.sun, g); sun.intensity = lerp(2.6, 2.0 - 0.4 * swK, g); hemi.intensity = lerp(2.3, 1.2 + 0.8 * swK, g);
       ground.material.color.copy(W0.sh).lerp(W1.sh, g); ground.material.opacity = lerp(0.3, 0.34, g);
       line.opacity = lerp(0.88, 0.24, g); W.mid.opacity = lerp(0.6, 0.14, g);
       for (const m of hulls) m.opacity = lerp(1, 0.25, g);
@@ -552,7 +557,7 @@ export async function build(labels) {
 // up with their wall) and 'ground' (elevation titles, finishes schedules, title block, which stay on the paper).
 function drawSheet(SH, layer, dots, pend) {
   const S = SH.s, X = x => (x - SH.x0) * S, Y = z => (z - SH.z0) * S;
-  const ACC = '#ff3b47';
+  const ACC = '#f4b63f';
   return canvasTex(Math.round(SH.w * S), Math.round(SH.d * S), (g) => {
     g.strokeStyle = INK; g.fillStyle = INK; g.lineCap = 'round';
     const font = (m, wt = 500) => { g.font = `${wt} ${Math.round(m * S)}px "IBM Plex Mono"`; };
@@ -690,9 +695,9 @@ function buildTextures() {
   };
   // the large print: a pale watercolour, lilac and rose clouds with small yellow flowers
   const poster = canvasTex(852, 492, (g, w, h) => {
-    g.fillStyle = '#d9cdc4'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#e9e2d2'; g.fillRect(0, 0, w, h);
     const q = rng(5);
-    for (let i = 0; i < 26; i++) blob(g, q() * w, q() * h, 90 + q() * 150, ['196,178,205', '222,186,186', '226,208,170', '205,190,215', '232,214,200'][i % 5], 0.5);
+    for (let i = 0; i < 26; i++) blob(g, q() * w, q() * h, 90 + q() * 150, ['154,170,144', '233,226,210', '224,195,152', '201,151,58', '243,240,233'][i % 5], 0.5);
     for (let i = 0; i < 9; i++) petals(g, 60 + q() * (w - 120), 60 + q() * (h - 120), 14 + q() * 16, 6, i % 3 ? 'rgba(232,206,120,0.9)' : 'rgba(238,232,224,0.9)');
     g.strokeStyle = 'rgba(120,140,105,0.55)'; g.lineWidth = 2.5;
     for (let i = 0; i < 6; i++) { const x = 80 + q() * (w - 160); g.beginPath(); g.moveTo(x, h - 20); g.quadraticCurveTo(x + 30 - q() * 60, h * 0.7, x + 20 - q() * 40, h * (0.35 + q() * 0.25)); g.stroke(); }
@@ -702,12 +707,12 @@ function buildTextures() {
   const tapestry = canvasTex(444, 432, (g, w, h) => {
     g.fillStyle = '#e6e3de'; g.fillRect(0, 0, w, h);
     for (let y = 0; y < h; y += 3) { g.fillStyle = y % 6 ? 'rgba(255,255,255,0.05)' : 'rgba(90,80,70,0.05)'; g.fillRect(0, y, w, 1.5); }
-    g.strokeStyle = '#6f7a5a'; g.lineWidth = 5; g.lineCap = 'round';
+    g.strokeStyle = '#8fa46f'; g.lineWidth = 5; g.lineCap = 'round';
     g.beginPath(); g.moveTo(w * 0.5, h * 0.92); g.quadraticCurveTo(w * 0.42, h * 0.6, w * 0.55, h * 0.36); g.stroke();
-    g.fillStyle = '#75805d';
+    g.fillStyle = '#8fa46f';
     for (const [x, y, a] of [[0.4, 0.68, -0.7], [0.56, 0.6, 0.6], [0.43, 0.5, -0.9]]) { g.beginPath(); g.ellipse(w * x, h * y, 34, 12, a, 0, 7); g.fill(); }
-    petals(g, w * 0.56, h * 0.3, 52, 7, '#b4766c', '120,70,60');
-    petals(g, w * 0.36, h * 0.4, 22, 6, '#c99a8c', '120,70,60');
+    petals(g, w * 0.56, h * 0.3, 52, 7, '#c9973a', '120,70,60');
+    petals(g, w * 0.36, h * 0.4, 22, 6, '#e0c398', '120,70,60');
   });
   // the framed print by the window: a few lines of handwriting
   const quote = canvasTex(360, 600, (g, w, h) => {
@@ -721,28 +726,28 @@ function buildTextures() {
   });
   const artY = canvasTex(360, 480, (g, w, h) => {
     g.fillStyle = '#e2dccf'; g.fillRect(0, 0, w, h);
-    g.fillStyle = '#d9b869'; g.beginPath(); g.arc(w * 0.5, h * 0.42, w * 0.27, 0, 7); g.fill();
-    g.fillStyle = '#c99d6c'; g.beginPath(); g.ellipse(w * 0.5, h * 0.8, w * 0.36, h * 0.09, 0, 0, 7); g.fill();
+    g.fillStyle = '#c9973a'; g.beginPath(); g.arc(w * 0.5, h * 0.42, w * 0.27, 0, 7); g.fill();
+    g.fillStyle = '#c49a66'; g.beginPath(); g.ellipse(w * 0.5, h * 0.8, w * 0.36, h * 0.09, 0, 0, 7); g.fill();
     g.strokeStyle = 'rgba(90,80,60,0.5)'; g.lineWidth = 3; g.beginPath(); g.moveTo(w * 0.2, h * 0.66); g.lineTo(w * 0.8, h * 0.66); g.stroke();
   });
   const artC = canvasTex(360, 500, (g, w, h) => {
     g.fillStyle = '#e6e2dc'; g.fillRect(0, 0, w, h);
-    g.fillStyle = '#d7a79a'; g.beginPath(); g.ellipse(w * 0.56, h * 0.42, w * 0.2, h * 0.2, 0.3, 0, 7); g.fill();
-    g.fillStyle = '#8f9a80'; g.beginPath(); g.ellipse(w * 0.36, h * 0.62, w * 0.16, h * 0.1, -0.5, 0, 7); g.fill();
+    g.fillStyle = '#e0c398'; g.beginPath(); g.ellipse(w * 0.56, h * 0.42, w * 0.2, h * 0.2, 0.3, 0, 7); g.fill();
+    g.fillStyle = '#9aaa90'; g.beginPath(); g.ellipse(w * 0.36, h * 0.62, w * 0.16, h * 0.1, -0.5, 0, 7); g.fill();
     g.strokeStyle = '#2b2a28'; g.lineWidth = 4; g.lineCap = 'round';
     g.beginPath(); g.moveTo(w * 0.3, h * 0.2); g.bezierCurveTo(w * 0.7, h * 0.16, w * 0.72, h * 0.5, w * 0.46, h * 0.56); g.bezierCurveTo(w * 0.3, h * 0.6, w * 0.4, h * 0.8, w * 0.68, h * 0.8); g.stroke();
   });
   const artD = canvasTex(520, 380, (g, w, h) => {
     g.fillStyle = '#e6e3dd'; g.fillRect(0, 0, w, h);
-    g.fillStyle = '#7f8c68';
+    g.fillStyle = '#8fa46f';
     for (let i = 0; i < 26; i++) { const a = i / 26 * Math.PI * 2; g.beginPath(); g.ellipse(w / 2 + Math.cos(a) * 110, h / 2 + Math.sin(a) * 110, 26, 9, a + 1.0, 0, 7); g.fill(); }
-    for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2 + 0.3; g.fillStyle = '#d3a5a0'; g.beginPath(); g.arc(w / 2 + Math.cos(a) * 110, h / 2 + Math.sin(a) * 110, 9, 0, 7); g.fill(); }
+    for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2 + 0.3; g.fillStyle = '#e0c398'; g.beginPath(); g.arc(w / 2 + Math.cos(a) * 110, h / 2 + Math.sin(a) * 110, 9, 0, 7); g.fill(); }
   });
 
   return {
     plaster, plasterBump, fabricBump,
-    oak: woodVeneer([184, 138, 78], '112,70,28', 8),
-    birch: woodVeneer([214, 188, 156], '150,112,74', 8),
+    oak: woodVeneer([196, 154, 102], '112,70,28', 8),
+    birch: woodVeneer([224, 195, 152], '150,112,74', 8),
     floor: oakFloor(),
     brick: brickWall(),
     rug: rug(),
@@ -788,7 +793,7 @@ function oakFloor() {
       let y = -r() * 0.6 * S;
       while (y < h) {
         const L = (0.32 + r() * 0.6) * S, t = r(), u = r();
-        const c = [170 + t * 20 - 10 + u * 4, 139 + t * 17 - 8, 104 + t * 14 - 7 - u * 4].map(Math.round);
+        const c = [190 + t * 20 - 10 + u * 4, 148 + t * 17 - 8, 98 + t * 14 - 7 - u * 4].map(Math.round);
         g.fillStyle = `rgb(${c})`; g.fillRect(x, y, bw, L);
         const bv = Math.round(122 + t * 18);
         gb.fillStyle = `rgb(${bv},${bv},${bv})`; gb.fillRect(x, y, bw, L);
@@ -847,7 +852,7 @@ function rug() {
   const cb = document.createElement('canvas'); cb.width = W; cb.height = HH;
   const gb = cb.getContext('2d');
   const map = canvasTex(W, HH, (g, w, h) => {
-    g.fillStyle = '#bfab92'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#c49a66'; g.fillRect(0, 0, w, h);
     gb.fillStyle = '#787878'; gb.fillRect(0, 0, w, h);
     // two chains of diamonds along the rug, drawn with a broad line, a short bar across every crossing
     const m = 0.2 * S, nx = 6, nz = 2, cw = (w - 2 * m) / nx, ch = (h - 2 * m) / nz;

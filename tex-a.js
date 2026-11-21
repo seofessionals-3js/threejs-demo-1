@@ -1,22 +1,24 @@
 // Surfaces for the house in colour, painted once on canvas: warm oak boards like a well-oiled floor, the same oak
 // as a single board for cladding and joinery, white painted brick and a cream rug with a black lattice.
 // Every texture tiles in both directions and covers a square of `tile` metres (core.js toneMat o.realMap / o.mapM).
-import { THREE, rng, clamp } from './core.js';
+import { THREE, rng, clamp, TEXK, ANISO } from './core.js';
 
 function tex(c, repeat = true) {
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = ANISO;
   if (repeat) t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter;
   return t;
 }
-const canvas = (w, h = w) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; };
+// every painter below works in its own px; on the phone tier the canvas behind it is half that size each way
+const canvas = (w, h = w) => { const c = document.createElement('canvas'); c.width = Math.round(w * TEXK); c.height = Math.round(h * TEXK); const g = c.getContext('2d'); g.scale(TEXK, TEXK); return [c, g]; };
 const rgb = (c, a = 1) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`;
 const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
 
 // fine grain noise over the whole sheet, so nothing reads as flat paint up close
-function grain(g, w, h, amt, seed) {
+function grain(g, amt, seed) {
+  const w = g.canvas.width, h = g.canvas.height;
   const r = rng(seed), d = g.getImageData(0, 0, w, h), px = d.data;
-  for (let i = 0; i < px.length; i += 4) { const n = (r() - 0.5) * amt; px[i] += n; px[i + 1] += n * 0.92; px[i + 2] += n * 0.8; }
+  for (let i = 0; i < px.length; i += 4) { const n = (r() - 0.5) * amt; px[i] += n; px[i + 1] += n * 0.97; px[i + 2] += n * 0.9; }
   g.putImageData(d, 0, 0);
 }
 
@@ -39,7 +41,7 @@ function board(g, x, y, L, H, seed, base, horizontal) {
     const v = r() * H, bw = H * (0.15 + r() * 0.35);
     const b = g.createLinearGradient(0, v - bw, 0, v + bw);
     const dark = r() < 0.6;
-    b.addColorStop(0, 'rgba(0,0,0,0)'); b.addColorStop(0.5, dark ? 'rgba(96,58,26,0.10)' : 'rgba(255,232,190,0.10)'); b.addColorStop(1, 'rgba(0,0,0,0)');
+    b.addColorStop(0, 'rgba(0,0,0,0)'); b.addColorStop(0.5, dark ? 'rgba(110,84,56,0.10)' : 'rgba(255,232,190,0.10)'); b.addColorStop(1, 'rgba(0,0,0,0)');
     g.fillStyle = b; g.fillRect(0, v - bw, L, bw * 2);
   }
   // grain lines
@@ -47,7 +49,7 @@ function board(g, x, y, L, H, seed, base, horizontal) {
   for (let k = 0; k < n; k++) {
     const v0 = r() * H, amp = 0.6 + r() * 2.2, f = 0.002 + r() * 0.006, ph = r() * 6.3;
     const dark = r() < 0.72;
-    g.strokeStyle = dark ? `rgba(84,50,22,${0.05 + r() * 0.13})` : `rgba(255,236,200,${0.05 + r() * 0.1})`;
+    g.strokeStyle = dark ? `rgba(96,72,50,${0.05 + r() * 0.13})` : `rgba(255,236,200,${0.05 + r() * 0.1})`;
     g.lineWidth = 0.6 + r() * 1.6;
     g.beginPath();
     for (let u = -4; u <= L + 8; u += 8) { const v = v0 + Math.sin(u * f + ph) * amp + Math.sin(u * f * 3.1 + ph * 2) * amp * 0.3; u < 0 ? g.moveTo(u, v) : g.lineTo(u, v); }
@@ -58,7 +60,7 @@ function board(g, x, y, L, H, seed, base, horizontal) {
     const cu = L * (0.2 + r() * 0.6), cv = H * (0.3 + r() * 0.4), len = L * (0.18 + r() * 0.25);
     for (let k = 1; k < 7; k++) {
       const w = H * 0.07 * k, l = len * (0.45 + k * 0.12);
-      g.strokeStyle = `rgba(92,56,24,${0.16 - k * 0.016})`; g.lineWidth = 1.2 + r();
+      g.strokeStyle = `rgba(100,76,52,${0.16 - k * 0.016})`; g.lineWidth = 1.2 + r();
       g.beginPath(); g.moveTo(cu - l, cv - w);
       g.bezierCurveTo(cu - l * 0.2, cv - w, cu + l * 0.35, cv - w * 0.35, cu + l * 0.45, cv);
       g.bezierCurveTo(cu + l * 0.35, cv + w * 0.35, cu - l * 0.2, cv + w, cu - l, cv + w);
@@ -69,7 +71,7 @@ function board(g, x, y, L, H, seed, base, horizontal) {
   if (r() < 0.22) {
     const ku = L * (0.1 + r() * 0.8), kv = H * (0.25 + r() * 0.5), kr = H * (0.04 + r() * 0.05);
     for (let k = 4; k >= 1; k--) {
-      g.fillStyle = `rgba(${78 + k * 12},${46 + k * 9},${22 + k * 5},${0.1 + (4 - k) * 0.1})`;
+      g.fillStyle = `rgba(${92 + k * 10},${70 + k * 8},${48 + k * 5},${0.1 + (4 - k) * 0.1})`;
       g.beginPath(); g.ellipse(ku, kv, kr * k * 0.9, kr * k * 0.45, 0, 0, 7); g.fill();
     }
   }
@@ -77,7 +79,7 @@ function board(g, x, y, L, H, seed, base, horizontal) {
 }
 
 // boards laid in rows, staggered ends; tile metres square, rows of `w` metres. horizontal: rows run along u.
-export function oakPlanks({ px = 2048, tile = 2.28, w = 0.19, seed = 5, base = [184, 142, 102], seams = 0.5 } = {}) {
+export function oakPlanks({ px = 2048, tile = 2.28, w = 0.19, seed = 5, base = [196, 154, 102], seams = 0.5 } = {}) {
   const [c, g] = canvas(px), S = px / tile, H = w * S, rows = Math.round(tile / w), r = rng(seed);
   g.fillStyle = rgb(base); g.fillRect(0, 0, px, px);
   const ends = [];
@@ -92,22 +94,22 @@ export function oakPlanks({ px = 2048, tile = 2.28, w = 0.19, seed = 5, base = [
       x += L; used += L;
     }
   }
-  grain(g, px, px, 9, seed + 1);
+  grain(g, 9, seed + 1);
   // seams: a dark hairline with a lit lip below it, and the board ends
   for (let row = 0; row < rows; row++) {
     const y = Math.round(row * H);
-    g.fillStyle = `rgba(58,36,18,${seams})`; g.fillRect(0, y - 1, px, 2);
+    g.fillStyle = `rgba(64,50,36,${seams})`; g.fillRect(0, y - 1, px, 2);
     g.fillStyle = 'rgba(255,240,215,0.12)'; g.fillRect(0, y + 1, px, 1);
   }
   for (const [x, y] of ends) {
-    g.fillStyle = `rgba(58,36,18,${seams * 0.9})`; g.fillRect(Math.round(x) - 1, y, 2, H);
+    g.fillStyle = `rgba(64,50,36,${seams * 0.9})`; g.fillRect(Math.round(x) - 1, y, 2, H);
     if (x < 2) g.fillRect(px - 1, y, 1, H);
   }
   return tex(c);
 }
 
 // one continuous board face, grain running up the texture (v), broad tone bands so neighbouring boards differ
-export function oakBoard({ px = 1024, tile = 1.2, seed = 9, base = [190, 148, 106] } = {}) {
+export function oakBoard({ px = 1024, tile = 1.2, seed = 9, base = [196, 154, 102] } = {}) {
   const [c, g] = canvas(px), r = rng(seed);
   g.fillStyle = rgb(base); g.fillRect(0, 0, px, px);
   // vertical strips of slightly different wood, so cut boards don't all match; each strip wraps top to bottom
@@ -124,12 +126,12 @@ export function oakBoard({ px = 1024, tile = 1.2, seed = 9, base = [190, 148, 10
   }
   // make it tile top to bottom: near the edges, fade to a copy shifted by half a tile (continuous across the wrap)
   const [c2, g2] = canvas(px);
-  g2.drawImage(c, 0, -px / 2); g2.drawImage(c, 0, px / 2);
+  g2.drawImage(c, 0, -px / 2, px, px); g2.drawImage(c, 0, px / 2, px, px);
   const m = g2.createLinearGradient(0, 0, 0, px);
   m.addColorStop(0, 'rgba(0,0,0,1)'); m.addColorStop(0.18, 'rgba(0,0,0,0)'); m.addColorStop(0.82, 'rgba(0,0,0,0)'); m.addColorStop(1, 'rgba(0,0,0,1)');
   g2.globalCompositeOperation = 'destination-in'; g2.fillStyle = m; g2.fillRect(0, 0, px, px);
-  g.drawImage(c2, 0, 0);
-  grain(g, px, px, 8, seed + 3);
+  g.drawImage(c2, 0, 0, px, px);
+  grain(g, 8, seed + 3);
   return tex(c);
 }
 
@@ -143,7 +145,7 @@ export function whiteBrick({ px = 1024, tile = 1.2, seed = 13 } = {}) {
     const y = row * ch, off = (row % 2) * bw / 2;
     for (let k = -1; k <= 5; k++) {
       const x = k * bw + off, t = r();
-      const col = mix([238, 235, 229], [247, 245, 240], t);
+      const col = mix([232, 228, 219], [240, 236, 227], t);
       const draw = (xx) => {
         g.fillStyle = rgb(col); g.fillRect(xx + j / 2, y + j / 2, bw - j, ch - j);
         // the paint pools a little at the bottom edge, and the top catches the light
@@ -158,14 +160,14 @@ export function whiteBrick({ px = 1024, tile = 1.2, seed = 13 } = {}) {
       draw(x); if (x + bw > px) draw(x - px); if (x < 0) draw(x + px);
     }
   }
-  grain(g, px, px, 10, seed + 5);
+  grain(g, 10, seed + 5);
   return tex(c);
 }
 
 // cream wool with a black hand-drawn lattice of diamonds
 export function latticeRug({ px = 1024, tile = 1.2, seed = 21 } = {}) {
   const [c, g] = canvas(px), r = rng(seed);
-  g.fillStyle = '#e9e0cf'; g.fillRect(0, 0, px, px);
+  g.fillStyle = '#e9e2d2'; g.fillRect(0, 0, px, px);
   for (let i = 0; i < 9000; i++) { g.fillStyle = r() < 0.5 ? 'rgba(255,250,240,0.18)' : 'rgba(150,130,100,0.10)'; g.fillRect(r() * px, r() * px, 1.5, 3 + r() * 4); }
   const n = 4, cw = px / n;
   g.strokeStyle = 'rgba(30,28,26,0.92)'; g.lineCap = 'round';
@@ -182,6 +184,6 @@ export function latticeRug({ px = 1024, tile = 1.2, seed = 21 } = {}) {
     const x = (a + 0.5) * cw, y = (b + 0.5) * cw;
     g.lineWidth = 6; g.beginPath(); g.moveTo(x - 10, y); g.lineTo(x + 10, y); g.stroke();
   }
-  grain(g, px, px, 12, seed + 7);
+  grain(g, 12, seed + 7);
   return tex(c);
 }

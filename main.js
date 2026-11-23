@@ -9,7 +9,8 @@ const T_FIXED = Q.has('t') ? parseFloat(Q.get('t')) : (FIXED != null ? 99 : null
 const CHAIN = Q.has('chain');                         // arrived from the sheet before
 const LIVEONLY = FIXED != null || DRIVE;              // stills and recordings: no autoplay, no chaining
 // the three sheets play one after another; after the last one the portfolio starts again with Nummer 1, the Kartonmodell
-const SEQ = [{ dir: 'a', no: '01', name: 'Planblatt' }, { dir: 'b', no: '02', name: 'Abwicklung' }, { dir: 'c', no: '03', name: 'Geschossweise' }];
+// the order of the show is Planblatt, Geschossweise, Abwicklung; the files keep their letters (dir-b.js is the Abwicklung)
+const SEQ = [{ dir: 'a', no: '01', name: 'Planblatt' }, { dir: 'c', no: '02', name: 'Geschossweise' }, { dir: 'b', no: '03', name: 'Abwicklung' }];
 const SI = Math.max(0, SEQ.findIndex(s => s.dir === DIR));
 const NEXT = SI < SEQ.length - 1 ? SEQ[SI + 1] : { href: '/threejs-demo-6/?autoplay=1', no: '01', name: 'three.js Demo 1', sub: 'Kartonmodell', kicker: 'three.js Portfolio · Weiter mit' };
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;

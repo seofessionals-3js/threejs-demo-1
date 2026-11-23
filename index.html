@@ -45,8 +45,8 @@
     </div>
     <div class="dir-switch" id="dirSwitch" role="navigation" aria-label="Zeichnungsvariante">
       <a href="?dir=a" data-dir="a"><b>01</b><span>PLANBLATT</span></a>
-      <a href="?dir=b" data-dir="b"><b>02</b><span>ABWICKLUNG</span></a>
-      <a href="?dir=c" data-dir="c"><b>03</b><span>GESCHOSSWEISE</span></a>
+      <a href="?dir=c" data-dir="c"><b>02</b><span>GESCHOSSWEISE</span></a>
+      <a href="?dir=b" data-dir="b"><b>03</b><span>ABWICKLUNG</span></a>
     </div>
     <nav><span id="nav"></span><a class="pill" id="cta" href="#scroll"></a></nav>
   </header>
@@ -106,11 +106,13 @@
 <script>
   (function () {
     var d = (new URLSearchParams(location.search).get('dir') || 'a').toLowerCase();
-    var s = { a: ['01', 'Planblatt'], b: ['02', 'Abwicklung'], c: ['03', 'Geschossweise'] }[d] || ['01', 'Planblatt'];
+    var s = { a: ['01', 'Planblatt'], c: ['02', 'Geschossweise'], b: ['03', 'Abwicklung'] }[d] || ['01', 'Planblatt'];
     document.getElementById('xferNo').textContent = s[0]; document.getElementById('xferName').textContent = s[1];
   })();
 </script>
 <div id="scroll"></div>
 <script type="module" src="main.js"></script>
+<!-- Fotorealismus: the option offered on the house views (see threejs-demos/foto.js) -->
+<script src="/threejs-demos/foto.js" defer></script>
 </body>
 </html>

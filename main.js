@@ -8,10 +8,10 @@ const DRIVE = Q.has('drive');                         // a recorder sets time an
 const T_FIXED = Q.has('t') ? parseFloat(Q.get('t')) : (FIXED != null ? 99 : null);
 const CHAIN = Q.has('chain');                         // arrived from the sheet before
 const LIVEONLY = FIXED != null || DRIVE;              // stills and recordings: no autoplay, no chaining
-// the three sheets play one after another; after the last one the portfolio goes on with Nummer 1, the Wohnungsfinder
+// the three sheets play one after another; after the last one the portfolio starts again with Nummer 1, the Kartonmodell
 const SEQ = [{ dir: 'a', no: '01', name: 'Planblatt' }, { dir: 'b', no: '02', name: 'Abwicklung' }, { dir: 'c', no: '03', name: 'Geschossweise' }];
 const SI = Math.max(0, SEQ.findIndex(s => s.dir === DIR));
-const NEXT = SI < SEQ.length - 1 ? SEQ[SI + 1] : { href: '/threejs-demo-7/a-one-door/?autoplay=1', no: '01', name: 'Wohnungsfinder', sub: 'Eine Tür', kicker: 'three.js Portfolio · Weiter mit' };
+const NEXT = SI < SEQ.length - 1 ? SEQ[SI + 1] : { href: '/threejs-demo-6/?autoplay=1', no: '01', name: 'three.js Demo 1', sub: 'Kartonmodell', kicker: 'three.js Portfolio · Weiter mit' };
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 if (!LIVEONLY) scrollTo(0, 0);
 
@@ -183,7 +183,7 @@ function swirl(cs, u) {
   cs.sx = lerp(cs.sx || 0, 0, e); cs.sy = lerp(cs.sy || 0, SW.sy ?? -0.04, e);
 }
 const xfer = $('xfer'), xferK = xfer.querySelector('.xk'), XK0 = xferK?.textContent;
-function setXfer(s) { xfer.classList.toggle('chalk', !!s.href); $('xferNo').textContent = s.no; $('xferName').textContent = s.name; if (xferK) xferK.textContent = s.kicker || XK0; }
+function setXfer(s) { xfer.classList.toggle('desk', !!s.href); $('xferNo').textContent = s.no; $('xferName').textContent = s.name; if (xferK) xferK.textContent = s.kicker || XK0; }
 // the sheet tabs take the same way out, only quicker
 dirLinks.forEach(a => a.addEventListener('click', e => {
   if (LIVEONLY) return;

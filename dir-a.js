@@ -755,7 +755,7 @@ export async function build(labels, dims) {
       ],
     },
     chrome: {
-      title: 'three.js Demo 1 · Das Planblatt',
+      title: 'three.js Demo 6 · Das Planblatt',
       dwg: 'AXO.04',
       brand: 'Purlin', brandSub: 'Holzhäuser',
       nav: 'Häuser     Werkstatt     Journal', cta: 'Haus anfragen',

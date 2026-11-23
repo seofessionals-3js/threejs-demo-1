@@ -1,6 +1,6 @@
-# three.js Demo 7
+# three.js Demo 6
 
-In der Übersicht und in der durchlaufenden Schau ist das die Nummer 7; das Repository heißt weiter `threejs-demo-1`, damit alle Adressen gültig bleiben. Am Ende der drei Blätter übergibt es selbst an Nummer 1, den Wohnungsfinder.
+In der Übersicht und in der durchlaufenden Schau ist das die Nummer 6, die letzte; das Repository heißt weiter `threejs-demo-1`, damit alle Adressen gültig bleiben. Am Ende der drei Blätter übergibt es selbst an Nummer 1, das Kartonmodell.
 
 
 Eine Explosionsaxonometrie eines zweigeschossigen Hauses, als weiße Linien auf ein preußischblaues Blatt geplottet, wie eine Blaupause. Beim Scrollen landen die sieben Schichten nacheinander in Bauabfolge. Dann weitet sich das Objektiv, bis die Zeichnung zum Raum wird, die große Glasschiebetür gleitet auf, und Sie gehen hinein, die Treppe hinauf und bis unter den First.
@@ -32,7 +32,7 @@ Sieben Schichten: Boden, Erdgeschoss, Obergeschoss, Verglasung, Fassade, Dachtra
 
 - **Die Farbe kommt an der Haustür.** Sobald die Kamera an der Tür steht, füllt sich das Bild in etwa 3,5 Sekunden mit Farbe: ein blasser, dunstiger Himmel mit weichen weißen Wolken über den ganzen Bildschirm, weißer Putz, Eiche, Salbeigrün und blassgrünliches Glas, bewusst als Illustration und nicht als Rendering. In Variante A breitet sie sich vom Kamin aus, in B fällt sie durchs Fenster herein, in C steigt sie von der Straße auf. Eine schmale Front im gelben Bleistift führt sie an (`LIVE` in `core.js`).
 - **Am Ende geht es zurück vor das Haus.** Nach dem letzten Raum schwenkt die Kamera in einer Drehung hinaus vor die Fassade, und die Farbe zieht sich dabei zurück: in A vom First zum Boden, in B öffnet sich das Zimmer dabei zum Schnittmodell, wie ein Puppenhaus, und die Farbe geht zurück durchs Fenster, in C in weichen Flecken von oben.
-- **Die Varianten laufen nacheinander.** Jede Variante spielt sich von selbst ab und verweilt an jeder Station. Am Ende zeichnet sich das Blatt zurück, ein Übergang schließt das Bild, und die nächste Variante beginnt: A, B, C und wieder A. Jede Variante hat ihren eigenen Übergang hinein und hinaus. Eigenes Scrollen übernimmt, die Taste `P` oder der Knopf unten links gibt die Steuerung zurück. Nach Variante C geht die Schau mit Demo 2 weiter, und so durch alle sieben Demos (siehe [threejs-demos](https://github.com/seofessionals-3js/threejs-demos)).
+- **Die Varianten laufen nacheinander.** Jede Variante spielt sich von selbst ab und verweilt an jeder Station. Am Ende zeichnet sich das Blatt zurück, ein Übergang schließt das Bild, und die nächste Variante beginnt: A, B, C und wieder A. Jede Variante hat ihren eigenen Übergang hinein und hinaus. Eigenes Scrollen übernimmt, die Taste `P` oder der Knopf unten links gibt die Steuerung zurück. Nach Variante C beginnt die Schau wieder mit Demo 1, dem Kartonmodell, und läuft so durch alle sechs Demos (siehe [threejs-demos](https://github.com/seofessionals-3js/threejs-demos)).
 - **Variante B als helles Wohn- und Arbeitszimmer.** 4,8 × 4,8 m, 3,00 m hoch: eine weiß gestrichene Ziegelwand mit Schreibtisch, Stuhl, Eichenregal und Bildern, gegenüber das Holzfenster mit Rollo, Sofa, Plattenspieler und Pflanzen, in der Mitte ein Eichen-Couchtisch auf einem Teppich mit anthrazitfarbenem Rautenmuster, darunter ein Boden aus schmalem Eichenparkett. In Farbe steht das Zimmer vor einem hellgrauen Studiohintergrund. Am Ende senken sich die beiden vorderen Wände, die Decke gleitet weg, und Sie sehen das Zimmer von schräg oben.
 - **Variante A in Eiche.** In Farbe ist das Haus aus geölter Eiche wie ein warmer Dielenboden: Eichendielen auf beiden Böden, helle Eiche an Decken und Dachuntersicht, senkrechte Eichenbretter an der Fassade. Dazu weiß gestrichener Ziegel am Kaminblock, weißer Putz, weiße Küchenfronten und ein cremefarbener Teppich mit anthrazitfarbenem Rautenmuster. Die Oberflächen werden beim Laden auf Canvas gemalt (`tex-a.js`) und in Metern auf die Flächen gelegt (`realMap` in `toneMat`).
 
@@ -70,7 +70,7 @@ Das Medium ist eine Blaupause (Cyanotypie): preußischblaues Blatt, weiße Druck
 | Himmel | `#dbe7f1` zum Horizont `#f3f1ea` | blass, dunstig, weiche weiße Wolken |
 | Fichte / Betonkern | `#dcc08f` / `#b8b5ad` | nur Variante C |
 
-Im Zeichnungszustand färbt eine Tonwertzuordnung im Material (`patchFill`, `toneMat`) jede Fläche in einen blauen Lavur-Ton zwischen `#163a72` und `#3a6db8`. Die Übergangskarte vor Demo 2 ist ein Transparentpapier-Blatt (`#e9e7e0`, Tusche `#1b1c1e`, orange Nummernmarke `#e07a12`), die zwischen den Varianten ein Blaupausenblatt.
+Im Zeichnungszustand färbt eine Tonwertzuordnung im Material (`patchFill`, `toneMat`) jede Fläche in einen blauen Lavur-Ton zwischen `#163a72` und `#3a6db8`. Die Übergangskarte vor Demo 1 hat die Farben des Kartonmodells (Atelier in der Dämmerung `#323841`, Karton `#f5f2ea`, Nummernmarke im Lampenlicht `#f2a531`), die zwischen den Varianten ein Blaupausenblatt.
 
 ## Dateien
 

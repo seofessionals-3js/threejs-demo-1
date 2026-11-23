@@ -539,7 +539,7 @@ export async function build(labels) {
       ],
     },
     chrome: {
-      title: 'three.js Demo 1 · Abwicklung',
+      title: 'three.js Demo 6 · Abwicklung',
       dwg: 'ELEV.02',
       brand: 'Field', brandSub: 'Innenausbau und Schreinerei',
       nav: 'Räume     Schreinerei     Studio', cta: 'Termin vereinbaren',

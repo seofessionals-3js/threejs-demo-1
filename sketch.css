@@ -419,10 +419,10 @@ html.chain #xfer { opacity: 1; }
 html.chain #fade { display: none; }
 #xfer .xk { font: 500 10px var(--mono); letter-spacing: .24em; color: var(--mute); }
 #xfer .xn { font: 600 15px var(--mono); letter-spacing: .3em; color: var(--accent); padding: 3px 10px; border: 1px solid var(--accent); }
-/* the card for the Wohnungsfinder (Nummer 1) is its own medium: buff toned paper, black chalk, one Rötel chip */
-#xfer.chalk { background: #dfd2ba; color: #2a2522; }
-#xfer.chalk .xk { color: #6e6257; }
-#xfer.chalk .xn { background: #a5432b; border-color: #a5432b; color: #fcf9f2; }
+/* the card for the Kartonmodell (Nummer 1) is its own medium: the studio at dusk, white card, one chip of lamplight */
+#xfer.desk { background: #323841; color: #f5f2ea; }
+#xfer.desk .xk { color: #b9bcc0; }
+#xfer.desk .xn { background: #f2a531; border-color: #f2a531; color: #262b31; }
 #xfer .xt { font: 600 clamp(36px, 5vw, 64px)/1 var(--display); letter-spacing: .02em; }
 
 #legend { display: none; }
